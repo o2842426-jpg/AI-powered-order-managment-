@@ -1,0 +1,17 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap");
+
+html {
+  dir: rtl;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans Arabic", var(--dm-font, "Segoe UI", system-ui, sans-serif);
+  background: var(--dm-color-bg, #f6f7fb);
+  color: var(--dm-color-text, #151515);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}

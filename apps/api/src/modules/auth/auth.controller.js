@@ -1,0 +1,161 @@
+const crypto = require("crypto");
+const { db } = require("../../db/client");
+
+const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
+
+function getAuthSecret() {
+  return process.env.AUTH_SECRET || "dev-auth-secret-change-me";
+}
+
+function base64Url(input) {
+  return Buffer.from(input).toString("base64url");
+}
+
+function signPayload(payload) {
+  const encodedPayload = base64Url(JSON.stringify(payload));
+  const signature = crypto
+    .createHmac("sha256", getAuthSecret())
+    .update(encodedPayload)
+    .digest("base64url");
+
+  return `${encodedPayload}.${signature}`;
+}
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const key = crypto.scryptSync(password, salt, 64).toString("hex");
+  return `scrypt$${salt}$${key}`;
+}
+
+function verifyPassword(password, storedHash) {
+  const [method, salt, key] = String(storedHash || "").split("$");
+  if (method !== "scrypt" || !salt || !key) return false;
+
+  const candidate = crypto.scryptSync(password, salt, 64);
+  const expected = Buffer.from(key, "hex");
+  return (
+    candidate.length === expected.length &&
+    crypto.timingSafeEqual(candidate, expected)
+  );
+}
+
+function createAuthResponse(user) {
+  const payload = {
+    sub: user.id,
+    store_id: user.store_id,
+    role: user.role,
+    exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS,
+  };
+
+  return {
+    token: signPayload(payload),
+    user: {
+      id: user.id,
+      store_id: user.store_id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+  };
+}
+
+function register(req, res) {
+  try {
+    const { store_id, name, email, password } = req.body;
+    const storeId = Number(store_id);
+
+    if (Number.isNaN(storeId) || storeId <= 0) {
+      return res.status(400).json({ message: "store_id is required." });
+    }
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ message: "name is required." });
+    }
+    if (!email || !String(email).trim()) {
+      return res.status(400).json({ message: "email is required." });
+    }
+    if (!password || String(password).length < 6) {
+      return res.status(400).json({
+        message: "password must be at least 6 characters.",
+      });
+    }
+
+    const store = db.prepare("SELECT id FROM stores WHERE id = ?").get(storeId);
+    if (!store) {
+      return res.status(400).json({ message: "Store does not exist." });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const existingUser = db
+      .prepare("SELECT id FROM users WHERE email = ?")
+      .get(normalizedEmail);
+
+    if (existingUser) {
+      return res.status(409).json({ message: "Email already registered." });
+    }
+
+    const result = db
+      .prepare(
+        `
+          INSERT INTO users (store_id, name, email, password_hash, role)
+          VALUES (?, ?, ?, ?, 'owner')
+        `
+      )
+      .run(
+        storeId,
+        String(name).trim(),
+        normalizedEmail,
+        hashPassword(String(password))
+      );
+
+    const user = db
+      .prepare("SELECT id, store_id, name, email, role FROM users WHERE id = ?")
+      .get(result.lastInsertRowid);
+
+    return res.status(201).json({ data: createAuthResponse(user) });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Could not register owner.",
+      error: error.message,
+    });
+  }
+}
+
+function login(req, res) {
+  try {
+    const { email, password } = req.body;
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+
+    if (!normalizedEmail || !password) {
+      return res.status(400).json({
+        message: "email and password are required.",
+      });
+    }
+
+    const user = db
+      .prepare(
+        `
+          SELECT id, store_id, name, email, password_hash, role
+          FROM users
+          WHERE email = ?
+        `
+      )
+      .get(normalizedEmail);
+
+    if (!user || !verifyPassword(String(password), user.password_hash)) {
+      return res.status(401).json({ message: "Invalid email or password." });
+    }
+
+    return res.status(200).json({ data: createAuthResponse(user) });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Could not login.",
+      error: error.message,
+    });
+  }
+}
+
+module.exports = {
+  register,
+  login,
+  getAuthSecret,
+};

@@ -1,0 +1,28 @@
+/**
+ * SaaS design tokens — spacing: 8, 12, 16, 24, 32px
+ */
+:root {
+  --dm-color-primary: #6d5ef9;
+  --dm-color-primary-hover: #5b4cf0;
+  --dm-color-bg: #f6f7fb;
+  --dm-color-surface: #ffffff;
+  --dm-color-text: #151515;
+  --dm-color-text-muted: #6b7280;
+  --dm-color-border: #eaecef;
+  --dm-color-success: #22c55e;
+  --dm-color-warning: #f59e0b;
+  --dm-color-danger: #ef4444;
+  --dm-radius-lg: 24px;
+  --dm-radius-md: 16px;
+  --dm-radius-pill: 999px;
+  --dm-shadow-soft: 0 4px 24px rgba(21, 21, 21, 0.06);
+  --dm-shadow-card: 0 8px 32px rgba(21, 21, 21, 0.06);
+  --dm-space-1: 8px;
+  --dm-space-2: 12px;
+  --dm-space-3: 16px;
+  --dm-space-4: 24px;
+  --dm-space-5: 32px;
+  --dm-sidebar-width: 260px;
+  --dm-header-height: 64px;
+  --dm-font: "Segoe UI", system-ui, -apple-system, Tahoma, sans-serif;
+}
