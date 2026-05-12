@@ -40,6 +40,11 @@ function verifyPassword(password, storedHash) {
 }
 
 function createAuthResponse(user) {
+  const storeRow = db
+    .prepare("SELECT slug FROM stores WHERE id = ?")
+    .get(user.store_id);
+  const store_slug = storeRow?.slug ? String(storeRow.slug) : null;
+
   const payload = {
     sub: user.id,
     store_id: user.store_id,
@@ -55,6 +60,7 @@ function createAuthResponse(user) {
       name: user.name,
       email: user.email,
       role: user.role,
+      store_slug,
     },
   };
 }

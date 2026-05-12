@@ -45,7 +45,7 @@ function StorefrontSearchField({ searchTerm, onSearchChange, variant = "nav", in
   );
 }
 
-export function StorefrontPage() {
+export function StorefrontPage({ publicSlugVersion = "guest" }) {
   const productsSectionRef = useRef(null);
   const productDetailSectionRef = useRef(null);
   const checkoutSectionRef = useRef(null);
@@ -149,7 +149,13 @@ export function StorefrontPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [publicSlugVersion]);
+
+  useEffect(() => {
+    setChatSessionId(null);
+    setChatMessages([]);
+    setChatError("");
+  }, [publicSlugVersion]);
 
   useEffect(() => {
     const mobileNavMq = () => window.innerWidth <= 959;
@@ -263,7 +269,7 @@ export function StorefrontPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedProductId]);
+  }, [selectedProductId, publicSlugVersion]);
 
   /** عند فتح تفاصيل جديدة: اختر أول variant تلقائيًا إن وُجد */
   useEffect(() => {

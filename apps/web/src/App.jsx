@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import { OwnerShell } from "./components/OwnerShell";
-import { authFetch, clearAuth, getStoredAuth } from "./lib/auth";
+import { authFetch, clearAuth, getStoredAuth, storeAuth } from "./lib/auth";
+import { rememberPublicStoreSlug } from "./lib/publicStoreSlug";
 import { OwnerDashboardPage } from "./pages/OwnerDashboardPage";
 import { OwnerLoginPage } from "./pages/OwnerLoginPage";
 import { OwnerOrdersPage } from "./pages/OwnerOrdersPage";
@@ -81,6 +82,32 @@ function App() {
       cancelled = true;
     };
   }, [ownerAuth, billingRefresh]);
+
+  useEffect(() => {
+    const u = ownerAuth?.user;
+    if (!u?.store_id || u.store_slug) return;
+    let cancelled = false;
+    authFetch(`/api/stores/${u.store_id}/settings`)
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok || !body.data?.slug) return;
+        if (cancelled) return;
+        const auth = getStoredAuth();
+        if (!auth?.user || String(auth.user.store_id) !== String(u.store_id)) return;
+        if (auth.user.store_slug) return;
+        const next = {
+          ...auth,
+          user: { ...auth.user, store_slug: body.data.slug },
+        };
+        storeAuth(next);
+        rememberPublicStoreSlug(body.data.slug);
+        setOwnerAuth(next);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerAuth?.user?.store_id, ownerAuth?.user?.store_slug]);
 
   useEffect(() => {
     if (view !== "orders") {
@@ -313,7 +340,15 @@ function App() {
             </div>
           )}
 
-          {view === "store" && <StorefrontPage />}
+          {view === "store" && (
+            <StorefrontPage
+              publicSlugVersion={
+                ownerAuth?.user
+                  ? `${ownerAuth.user.store_id}:${ownerAuth.user.store_slug ?? ""}`
+                  : "guest"
+              }
+            />
+          )}
           {view === "owner-login" && (
             <OwnerLoginPage
               onAuthenticated={(auth) => {
