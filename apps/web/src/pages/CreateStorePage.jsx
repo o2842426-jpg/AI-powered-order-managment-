@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { apiUrl } from "../lib/api";
+import { rememberPublicStoreSlug } from "../lib/publicStoreSlug";
 import { storeAuth } from "../lib/auth";
 import "./CreateStorePage.css";
 
@@ -57,6 +58,11 @@ export function CreateStorePage({ onDone, onBackToLogin }) {
         throw new Error(body.message || `تعذر الإنشاء (${res.status})`);
       }
 
+      const createdSlug = body.data?.store?.slug;
+      if (createdSlug) {
+        rememberPublicStoreSlug(createdSlug);
+      }
+
       storeAuth(body.data);
       onDone?.(body.data);
     } catch (err) {
@@ -72,9 +78,9 @@ export function CreateStorePage({ onDone, onBackToLogin }) {
         <p className="create-store__eyebrow">بداية جديدة</p>
         <h1>أنشئ متجرك</h1>
         <p className="create-store__lead">
-          أدخل بيانات المتجر وحساب المالك. بعد النجاح تُفتح لوحة التحكم مباشرة. لعرض المتجر
-          للزوار اضبط عند بناء الموقع: <code>VITE_STORE_SLUG</code> = نفس قيمة «رابط المتجر»
-          النهائية أدناه.
+          بعد النجاح يُحفظ معرّف الرابط في المتصفح ليُحمَّل متجرك هنا مباشرة. يمكنك أيضًا
+          إرسال رابط للزوار يتضمن <code>?store=معرّف-المتجر</code>، أو ضبط{" "}
+          <code>VITE_STORE_SLUG</code> عند بناء الموقع للنشر العام.
         </p>
 
         <form onSubmit={submit}>

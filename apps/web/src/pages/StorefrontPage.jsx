@@ -1,19 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiUrl } from "../lib/api";
+import { getEffectivePublicStoreSlug } from "../lib/publicStoreSlug";
 import "./StorefrontPage.css";
-
-/** معرّف المتجر في واجهة العملاء؛ يُضبط عند النشر عبر VITE_STORE_SLUG. */
-function readPublicStoreSlug() {
-  const fromEnv =
-    typeof import.meta.env.VITE_STORE_SLUG === "string"
-      ? import.meta.env.VITE_STORE_SLUG.trim()
-      : "";
-  if (fromEnv) return fromEnv;
-  if (import.meta.env.DEV) return "demo-store";
-  return "";
-}
-
-const PUBLIC_STORE_SLUG = readPublicStoreSlug();
 
 const QUICK_CHAT_QUESTIONS = [
   "هل يوجد توصيل؟",
@@ -115,13 +103,13 @@ export function StorefrontPage() {
   }
 
   useEffect(() => {
-    const slug = PUBLIC_STORE_SLUG;
+    const slug = getEffectivePublicStoreSlug();
     if (!slug) {
       setStore(null);
       setProducts([]);
       setLoading(false);
       setError(
-        "لم يُضبط معرّف المتجر. أضف VITE_STORE_SLUG في بيئة البناء ثم أعد النشر."
+        "لم يُعثر على معرّف المتجر. أنشئ متجرًا من «إنشاء متجر» (يُحفظ تلقائيًا في هذا المتصفح)، أو افتح الرابط مع ?store=معرّف-المتجر، أو اضبط VITE_STORE_SLUG عند بناء الموقع."
       );
       return;
     }
@@ -236,7 +224,7 @@ export function StorefrontPage() {
       return;
     }
 
-    const slug = PUBLIC_STORE_SLUG;
+    const slug = getEffectivePublicStoreSlug();
     if (!slug) {
       setDetailError("إعداد المتجر ناقص.");
       return;
@@ -474,7 +462,7 @@ export function StorefrontPage() {
   }
 
   async function sendOrder() {
-    const slug = PUBLIC_STORE_SLUG;
+    const slug = getEffectivePublicStoreSlug();
 
     setCheckoutError("");
 
@@ -555,7 +543,7 @@ export function StorefrontPage() {
   async function ensureChatSession() {
     if (chatSessionId) return chatSessionId;
 
-    const slug = PUBLIC_STORE_SLUG;
+    const slug = getEffectivePublicStoreSlug();
     if (!slug) {
       setChatError("إعداد المتجر ناقص.");
       return null;
@@ -588,7 +576,7 @@ export function StorefrontPage() {
       const sessionId = await ensureChatSession();
       if (!sessionId) return;
 
-      const slug = PUBLIC_STORE_SLUG;
+      const slug = getEffectivePublicStoreSlug();
       const res = await fetch(
         apiUrl(`/api/public/${encodeURIComponent(slug)}/chat/messages`),
         {
