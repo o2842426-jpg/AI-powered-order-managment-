@@ -1,0 +1,125 @@
+.create-store {
+  max-width: 520px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.create-store__card {
+  padding: 1.4rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.08);
+}
+
+.create-store__eyebrow {
+  margin: 0 0 0.3rem;
+  color: #6366f1;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.create-store h1 {
+  margin: 0 0 0.5rem;
+  color: #111827;
+}
+
+.create-store__lead {
+  margin: 0 0 1rem;
+  color: #6b7280;
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+.create-store__lead code {
+  font-size: 0.78rem;
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.create-store__ok {
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #166534;
+  font-size: 0.88rem;
+  margin-bottom: 1rem;
+}
+
+.create-store label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.create-store input,
+.create-store textarea {
+  padding: 0.58rem 0.7rem;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  font: inherit;
+}
+
+.create-store textarea {
+  resize: vertical;
+  min-height: 56px;
+}
+
+.create-store__hint {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.create-store__hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 1rem 0;
+}
+
+.create-store button[type="submit"] {
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid #4f46e5;
+  border-radius: 9px;
+  background: #4f46e5;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.create-store button[type="submit"]:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.create-store__error {
+  color: #b91c1c;
+  font-size: 0.88rem;
+  margin: 0 0 0.5rem;
+}
+
+.create-store__footer {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.create-store__linkish {
+  border: none;
+  background: none;
+  color: #4f46e5;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.create-store__linkish:hover {
+  color: #4338ca;
+}

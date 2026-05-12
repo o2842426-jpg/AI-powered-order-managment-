@@ -5,7 +5,7 @@ import "./OwnerLoginPage.css";
 
 const DEFAULT_STORE_ID = "1";
 
-export function OwnerLoginPage({ onAuthenticated }) {
+export function OwnerLoginPage({ onAuthenticated, onGoCreateStore }) {
   const [mode, setMode] = useState("login");
   const [storeId, setStoreId] = useState(DEFAULT_STORE_ID);
   const [name, setName] = useState("");
@@ -121,6 +121,12 @@ export function OwnerLoginPage({ onAuthenticated }) {
         >
           {mode === "login" ? "ليس لديك حساب؟ أنشئ حسابًا" : "لديك حساب؟ سجل دخول"}
         </button>
+
+        {typeof onGoCreateStore === "function" ? (
+          <button type="button" className="owner-login__switch" onClick={() => onGoCreateStore()}>
+            ليس لديك متجر؟ أنشئ متجرًا جديدًا
+          </button>
+        ) : null}
       </div>
     </section>
   );

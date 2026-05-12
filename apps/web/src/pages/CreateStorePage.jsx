@@ -1,0 +1,185 @@
+import { useMemo, useState } from "react";
+import { apiUrl } from "../lib/api";
+import { storeAuth } from "../lib/auth";
+import "./CreateStorePage.css";
+
+function normalizeSlugPreview(input) {
+  return String(input || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/--+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+}
+
+export function CreateStorePage({ onDone, onBackToLogin }) {
+  const [storeName, setStoreName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [phone, setPhone] = useState("");
+  const [deliveryInfo, setDeliveryInfo] = useState("");
+  const [ownerName, setOwnerName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const slugPreview = useMemo(() => normalizeSlugPreview(slug), [slug]);
+
+  async function submit(event) {
+    event.preventDefault();
+    setError("");
+
+    if (password !== password2) {
+      setError("كلمتا المرور غير متطابقتين.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(apiUrl("/api/auth/create-store"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          store_name: storeName.trim(),
+          slug: slug.trim() || undefined,
+          phone: phone.trim() || undefined,
+          delivery_info: deliveryInfo.trim() || undefined,
+          owner_name: ownerName.trim(),
+          email: email.trim(),
+          password,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.message || `تعذر الإنشاء (${res.status})`);
+      }
+
+      storeAuth(body.data);
+      onDone?.(body.data);
+    } catch (err) {
+      setError(err.message || "تعذر إنشاء المتجر.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <section className="create-store">
+      <div className="create-store__card">
+        <p className="create-store__eyebrow">بداية جديدة</p>
+        <h1>أنشئ متجرك</h1>
+        <p className="create-store__lead">
+          أدخل بيانات المتجر وحساب المالك. بعد النجاح تُفتح لوحة التحكم مباشرة. لعرض المتجر
+          للزوار اضبط عند بناء الموقع: <code>VITE_STORE_SLUG</code> = نفس قيمة «رابط المتجر»
+          النهائية أدناه.
+        </p>
+
+        <form onSubmit={submit}>
+          <label>
+            اسم المتجر (يظهر للعملاء)
+            <input
+              value={storeName}
+              onChange={(e) => setStoreName(e.target.value)}
+              required
+              minLength={2}
+              autoComplete="organization"
+            />
+          </label>
+
+          <label>
+            رابط المتجر (إنجليزي، اختياري — مثل noor-style)
+            <input
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              placeholder="يُولَّد تلقائيًا من الاسم إن تُرك فارغًا"
+            />
+            {slugPreview ? (
+              <span className="create-store__hint">معاينة: {slugPreview}</span>
+            ) : null}
+          </label>
+
+          <label>
+            هاتف المتجر
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              inputMode="tel"
+              autoComplete="tel"
+            />
+          </label>
+
+          <label>
+            معلومات التوصيل (اختياري)
+            <textarea
+              value={deliveryInfo}
+              onChange={(e) => setDeliveryInfo(e.target.value)}
+              rows={2}
+            />
+          </label>
+
+          <hr className="create-store__hr" />
+
+          <label>
+            اسمك كمالك
+            <input
+              value={ownerName}
+              onChange={(e) => setOwnerName(e.target.value)}
+              required
+              autoComplete="name"
+            />
+          </label>
+
+          <label>
+            البريد الإلكتروني (لتسجيل الدخول)
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+          </label>
+
+          <label>
+            كلمة المرور (6 أحرف على الأقل)
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              autoComplete="new-password"
+            />
+          </label>
+
+          <label>
+            تأكيد كلمة المرور
+            <input
+              type="password"
+              value={password2}
+              onChange={(e) => setPassword2(e.target.value)}
+              required
+              minLength={6}
+              autoComplete="new-password"
+            />
+          </label>
+
+          {error ? <p className="create-store__error">{error}</p> : null}
+
+          <button type="submit" disabled={loading}>
+            {loading ? "جاري الإنشاء…" : "إنشاء المتجر والدخول"}
+          </button>
+        </form>
+
+        <div className="create-store__footer">
+          <button type="button" className="create-store__linkish" onClick={onBackToLogin}>
+            لدي حساب بالفعل — دخول المالك
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}

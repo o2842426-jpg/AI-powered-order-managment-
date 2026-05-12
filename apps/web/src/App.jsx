@@ -5,6 +5,7 @@ import { authFetch, clearAuth, getStoredAuth } from "./lib/auth";
 import { OwnerDashboardPage } from "./pages/OwnerDashboardPage";
 import { OwnerLoginPage } from "./pages/OwnerLoginPage";
 import { OwnerOrdersPage } from "./pages/OwnerOrdersPage";
+import { CreateStorePage } from "./pages/CreateStorePage";
 import { StorefrontPage } from "./pages/StorefrontPage";
 
 const OWNER_APP_VIEWS = new Set([
@@ -232,6 +233,15 @@ function App() {
       <button
         type="button"
         className={
+          view === "create-store" ? "app-public-nav__btn is-active" : "app-public-nav__btn"
+        }
+        onClick={() => setView("create-store")}
+      >
+        إنشاء متجر
+      </button>
+      <button
+        type="button"
+        className={
           view === "owner-login" ? "app-public-nav__btn is-active" : "app-public-nav__btn"
         }
         onClick={() => setView("owner-login")}
@@ -310,6 +320,17 @@ function App() {
                 setOwnerAuth(auth);
                 setView(postLoginView || "dashboard");
               }}
+              onGoCreateStore={() => setView("create-store")}
+            />
+          )}
+          {view === "create-store" && (
+            <CreateStorePage
+              onDone={(auth) => {
+                setOwnerAuth(auth);
+                setPostLoginView("dashboard");
+                setView("dashboard");
+              }}
+              onBackToLogin={() => setView("owner-login")}
             />
           )}
         </main>

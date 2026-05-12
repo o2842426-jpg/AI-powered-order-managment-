@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { authFetch } from "../lib/auth";
+import { authFetch, getStoredAuth } from "../lib/auth";
 import "./OwnerDashboardPage.css";
 
 const DEFAULT_STORE_ID = "1";
@@ -227,6 +227,14 @@ export function OwnerDashboardPage({
   const [variantSaving, setVariantSaving] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const [dashboardMsg, setDashboardMsg] = useState("");
+
+  useEffect(() => {
+    const auth = getStoredAuth();
+    const sid = auth?.user?.store_id;
+    if (sid != null && String(sid) !== "") {
+      setStoreId(String(sid));
+    }
+  }, []);
 
   useEffect(() => {
     loadSummary();
