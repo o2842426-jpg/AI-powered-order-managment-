@@ -1,11 +1,21 @@
 const { db } = require("../../db/client");
 const { generateStoreChatReply } = require("../ai/ai.service");
 
+/** Normalize public URL slug: lowercase, underscores to hyphens (matches DB slugs). */
+function normalizePublicStoreSlug(raw) {
+  if (raw == null || typeof raw !== "string") return "";
+  let s = raw.trim().toLowerCase().replace(/_/g, "-");
+  while (s.includes("--")) {
+    s = s.replace(/--/g, "-");
+  }
+  return s.replace(/^-+|-+$/g, "") || "";
+}
+
 function listPublicProducts(req, res) {
   try {
-    const { storeSlug } = req.params;
+    const storeSlug = normalizePublicStoreSlug(req.params.storeSlug);
 
-    if (!storeSlug || typeof storeSlug !== "string") {
+    if (!storeSlug) {
       return res.status(400).json({
         message: "storeSlug is required.",
       });
@@ -79,10 +89,11 @@ function listPublicProducts(req, res) {
 
 function getSpecificProduct(req, res) {
   try {
-    const { storeSlug, productId } = req.params;
+    const storeSlug = normalizePublicStoreSlug(req.params.storeSlug);
+    const { productId } = req.params;
     const productIdNumber = Number(productId);
 
-    if (!storeSlug || typeof storeSlug !== "string") {
+    if (!storeSlug) {
       return res.status(400).json({
         message: "storeSlug is required.",
       });
@@ -163,10 +174,10 @@ function getSpecificProduct(req, res) {
 
 function createPublicOrder(req, res) {
   try {
-    const { storeSlug } = req.params;
+    const storeSlug = normalizePublicStoreSlug(req.params.storeSlug);
     const { customer, items, customer_note } = req.body;
 
-    if (!storeSlug || typeof storeSlug !== "string") {
+    if (!storeSlug) {
       return res.status(400).json({
         message: "storeSlug is required.",
       });
@@ -345,7 +356,7 @@ function createPublicOrder(req, res) {
 
 function createChatSession(req ,res){
   try{
-    const storeSlug = req.params.storeSlug;
+    const storeSlug = normalizePublicStoreSlug(req.params.storeSlug);
     
     if(!storeSlug){
       return res.status(400).json({message:"storeSlug is required"})
@@ -405,7 +416,7 @@ WHERE id = ?
 
 async function sendChatMessage(req ,res){
   try{
-    const storeSlug = req.params.storeSlug;
+    const storeSlug = normalizePublicStoreSlug(req.params.storeSlug);
     const {session_id , message_text} = req.body;
 
     const sessionId = Number(session_id);
@@ -542,7 +553,8 @@ LIMIT 2`);
 
 function getChatSessionMessages(req , res){
   try{
-    const {storeSlug ,sessionId} = req.params;
+    const storeSlug = normalizePublicStoreSlug(req.params.storeSlug);
+    const { sessionId } = req.params;
     const chatSessionId = Number(sessionId);
 
     if(!storeSlug ){
