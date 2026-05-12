@@ -65,12 +65,11 @@ async function generateStoreChatReply({
   messageText,
   conversationMessages,
 }) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
   if (!apiKey) {
     return FALLBACK_REPLY;
   }
 
-  const client = new OpenAI({ apiKey });
   const catalogText = buildCatalogText(products);
   const ownerPrompt = buildOwnerPrompt(store);
   const historyMessages = buildConversationMessages(
@@ -78,12 +77,16 @@ async function generateStoreChatReply({
     messageText
   );
 
-  const response = await client.chat.completions.create({
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-    messages: [
-      {
-        role: "system",
-        content: `أنت مساعد مبيعات لمتجر اسمه "${store.name}".
+  const model = String(process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
+
+  try {
+    const client = new OpenAI({ apiKey });
+    const response = await client.chat.completions.create({
+      model,
+      messages: [
+        {
+          role: "system",
+          content: `أنت مساعد مبيعات لمتجر اسمه "${store.name}".
 أجب بالعربية بشكل مختصر وواضح وبنبرة ودودة.
 اعتمد فقط على بيانات المنتجات والمخزون والأسعار الموجودة في السياق.
 لا تخترع أسعارًا أو مقاسات أو ألوانًا أو مخزونًا.
@@ -95,18 +98,22 @@ async function generateStoreChatReply({
 إذا كان المنتج مناسبًا، قل للعميل بوضوح أنه يمكنه الضغط على زر عرض المنتج أو إضافته للسلة من الشات.
 التزم بتعليمات صاحب المتجر التالية طالما لا تخالف بيانات المنتجات:
 ${ownerPrompt}`,
-      },
-      {
-        role: "system",
-        content: `بيانات المتجر والمنتجات:
+        },
+        {
+          role: "system",
+          content: `بيانات المتجر والمنتجات:
 ${catalogText}`,
-      },
-      ...historyMessages,
-    ],
-    temperature: 0.2,
-  });
+        },
+        ...historyMessages,
+      ],
+      temperature: 0.2,
+    });
 
-  return response.choices[0]?.message?.content?.trim() || FALLBACK_REPLY;
+    return response.choices[0]?.message?.content?.trim() || FALLBACK_REPLY;
+  } catch (err) {
+    console.error("[ai] OpenAI chat.completions failed:", err?.message || err);
+    return FALLBACK_REPLY;
+  }
 }
 
 module.exports = {
