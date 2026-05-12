@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { authFetch, getStoredAuth } from "../lib/auth";
+import { authFetch, getOwnerStoreIdFromAuth } from "../lib/auth";
 import "./OwnerDashboardPage.css";
 
-const DEFAULT_STORE_ID = "1";
 const EMPTY_PRODUCT = {
   name: "",
   description: "",
@@ -202,7 +201,7 @@ export function OwnerDashboardPage({
   onGoToOrders,
   onPreviewStore,
 }) {
-  const [storeId, setStoreId] = useState(DEFAULT_STORE_ID);
+  const storeId = getOwnerStoreIdFromAuth();
   const [settings, setSettings] = useState(null);
   const [summary, setSummary] = useState(null);
   const [summaryError, setSummaryError] = useState("");
@@ -229,14 +228,19 @@ export function OwnerDashboardPage({
   const [dashboardMsg, setDashboardMsg] = useState("");
 
   useEffect(() => {
-    const auth = getStoredAuth();
-    const sid = auth?.user?.store_id;
-    if (sid != null && String(sid) !== "") {
-      setStoreId(String(sid));
+    if (!storeId) {
+      setSummary(null);
+      setSummaryError("");
+      setLowStockItems([]);
+      setLowStockError("");
+      setSettings(null);
+      setSettingsError("");
+      setProducts([]);
+      setProductsError("");
+      setProductsLoading(false);
+      setLowStockLoading(false);
+      return;
     }
-  }, []);
-
-  useEffect(() => {
     loadSummary();
     loadLowStock();
     loadSettings();
@@ -319,7 +323,7 @@ export function OwnerDashboardPage({
   }
 
   async function saveSettings() {
-    if (!settings) return;
+    if (!settings || !storeId) return;
 
     setSettingsSaving(true);
     setSettingsError("");
@@ -370,6 +374,10 @@ export function OwnerDashboardPage({
   }
 
   async function createProduct() {
+    if (!storeId) {
+      setDashboardMsg("تعذر تحديد المتجر من الجلسة.");
+      return;
+    }
     setProductSaving(true);
     setDashboardMsg("");
 
@@ -710,15 +718,18 @@ export function OwnerDashboardPage({
 
   return (
     <div className="owner-dashboard">
+      {!storeId && (
+        <p className="owner-dashboard__error" role="alert">
+          لم يُعثر على معرّف المتجر في جلسة المالك. جرّب تسجيل الخروج والدخول مجددًا.
+        </p>
+      )}
       {!showOverview && (
         <div className="owner-dashboard__panel-top">
-          <label className="owner-dashboard__store-switcher owner-dashboard__store-switcher--inline">
-            <span>المتجر الحالي</span>
-            <input
-              value={storeId}
-              onChange={(event) => setStoreId(event.target.value)}
-            />
-          </label>
+          <div className="owner-dashboard__store-switcher owner-dashboard__store-switcher--inline owner-dashboard__store-switcher--readonly">
+            <span>معرّف متجرك</span>
+            <strong dir="ltr">{storeId || "—"}</strong>
+            <small className="owner-dashboard__muted">من جلسة تسجيل الدخول</small>
+          </div>
         </div>
       )}
 
@@ -764,13 +775,11 @@ export function OwnerDashboardPage({
           )}
         </div>
         <div className="owner-dashboard__hero-aside">
-          <label className="owner-dashboard__store-switcher">
-            <span>المتجر الحالي</span>
-            <input
-              value={storeId}
-              onChange={(event) => setStoreId(event.target.value)}
-            />
-          </label>
+          <div className="owner-dashboard__store-switcher owner-dashboard__store-switcher--readonly">
+            <span>معرّف متجرك</span>
+            <strong dir="ltr">{storeId || "—"}</strong>
+            <small className="owner-dashboard__muted">من جلسة تسجيل الدخول</small>
+          </div>
         </div>
       </section>
 

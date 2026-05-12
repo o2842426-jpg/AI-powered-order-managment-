@@ -14,6 +14,14 @@ export function getStoredAuth() {
   }
 }
 
+/** معرّف المتجر الحالي للمالك المسجّل، أو سلسلة فارغة إن لم يتوفر. */
+export function getOwnerStoreIdFromAuth() {
+  const auth = getStoredAuth();
+  const sid = auth?.user?.store_id;
+  if (sid == null || String(sid).trim() === "") return "";
+  return String(sid);
+}
+
 export function storeAuth(auth) {
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
 }

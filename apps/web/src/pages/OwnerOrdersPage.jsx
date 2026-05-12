@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
-import { authFetch } from '../lib/auth';
+import { authFetch, getOwnerStoreIdFromAuth } from '../lib/auth';
 import './OwnerOrdersPage.css';
-
-const DEFAULT_STORE_ID = '1';
 
 const ORDER_STATUSES = [
   'new',
@@ -22,7 +20,7 @@ const STATUS_LABELS = {
 };
 
 export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange } = {}) {
-  const [storeId, setStoreId] = useState(DEFAULT_STORE_ID);
+  const storeId = getOwnerStoreIdFromAuth();
   const [orders, setOrders] = useState([]);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [orderDetail, setOrderDetail] = useState(null);
@@ -100,8 +98,13 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
     async function load() {
       setLoading(true);
       setError(null);
-      const id = storeId.trim() || DEFAULT_STORE_ID;
-      const url = `/api/orders?store_id=${encodeURIComponent(id)}`;
+      if (!storeId.trim()) {
+        setOrders([]);
+        setError('لم يُعثر على معرّف المتجر في جلسة المالك. سجّل الخروج ثم الدخول مجددًا.');
+        setLoading(false);
+        return;
+      }
+      const url = `/api/orders?store_id=${encodeURIComponent(storeId)}`;
 
       try {
         const res = await authFetch(url);
@@ -451,15 +454,11 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
         <p className="owner-orders__hint">
           تابع الطلبات الجديدة، أكّدها بسرعة، وتواصل مع العميل بدون ضغط.
         </p>
-        <label className="owner-orders__field">
-          <span>معرّف المتجر (store_id)</span>
-          <input
-            type="text"
-            value={storeId}
-            onChange={(e) => setStoreId(e.target.value)}
-            inputMode="numeric"
-          />
-        </label>
+        <div className="owner-orders__store-badge" dir="ltr">
+          <span>معرّف المتجر</span>
+          <strong>{storeId || '—'}</strong>
+          <small>من جلسة تسجيل الدخول</small>
+        </div>
       </header>
 
       <section className="owner-orders__toolbar" aria-label="بحث وفلترة الطلبات">

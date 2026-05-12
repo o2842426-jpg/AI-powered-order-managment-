@@ -211,7 +211,11 @@ function App() {
 
     if (view === "orders") {
       return (
-        <OwnerOrdersPage searchQuery={orderSearch} onSearchChange={setOrderSearch} />
+        <OwnerOrdersPage
+          key={`orders-${ownerAuth.user?.store_id ?? ownerAuth.user?.id ?? "u"}`}
+          searchQuery={orderSearch}
+          onSearchChange={setOrderSearch}
+        />
       );
     }
 
@@ -225,6 +229,7 @@ function App() {
     ) {
       return (
         <OwnerDashboardPage
+          key={`dash-${ownerAuth.user?.store_id ?? ownerAuth.user?.id ?? "u"}`}
           panel={dashboardPanelFromView(view)}
           onNavigate={(target) => {
             const map = {

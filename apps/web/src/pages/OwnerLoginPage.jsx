@@ -3,11 +3,9 @@ import { apiUrl } from "../lib/api";
 import { storeAuth } from "../lib/auth";
 import "./OwnerLoginPage.css";
 
-const DEFAULT_STORE_ID = "1";
-
 export function OwnerLoginPage({ onAuthenticated, onGoCreateStore }) {
   const [mode, setMode] = useState("login");
-  const [storeId, setStoreId] = useState(DEFAULT_STORE_ID);
+  const [storeId, setStoreId] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,11 +17,25 @@ export function OwnerLoginPage({ onAuthenticated, onGoCreateStore }) {
     setLoading(true);
     setError("");
 
+    if (mode === "register") {
+      const sid = Number(String(storeId).trim());
+      if (!Number.isInteger(sid) || sid <= 0) {
+        setError("أدخل معرّف المتجر (رقمًا صحيحًا يطابق المتجر الذي تريد ربط حسابك به).");
+        setLoading(false);
+        return;
+      }
+      if (!String(name).trim()) {
+        setError("الاسم مطلوب.");
+        setLoading(false);
+        return;
+      }
+    }
+
     const endpoint = mode === "register" ? "/api/auth/register" : "/api/auth/login";
     const payload =
       mode === "register"
         ? {
-            store_id: Number(storeId),
+            store_id: Number(String(storeId).trim()),
             name,
             email,
             password,
@@ -66,11 +78,13 @@ export function OwnerLoginPage({ onAuthenticated, onGoCreateStore }) {
           {mode === "register" && (
             <>
               <label>
-                Store ID
+                معرّف المتجر (store_id)
                 <input
                   value={storeId}
                   onChange={(event) => setStoreId(event.target.value)}
                   inputMode="numeric"
+                  placeholder="مثال: 2"
+                  autoComplete="off"
                 />
               </label>
               <label>
@@ -102,7 +116,16 @@ export function OwnerLoginPage({ onAuthenticated, onGoCreateStore }) {
 
           {error && <p className="owner-login__error">{error}</p>}
 
-          <button type="submit" disabled={loading || !email || !password}>
+          <button
+            type="submit"
+            disabled={
+              loading ||
+              !email ||
+              !password ||
+              (mode === "register" &&
+                (!String(storeId).trim() || !String(name).trim()))
+            }
+          >
             {loading
               ? "جاري المعالجة..."
               : mode === "register"
@@ -117,6 +140,7 @@ export function OwnerLoginPage({ onAuthenticated, onGoCreateStore }) {
           onClick={() => {
             setMode((value) => (value === "login" ? "register" : "login"));
             setError("");
+            setStoreId("");
           }}
         >
           {mode === "login" ? "ليس لديك حساب؟ أنشئ حسابًا" : "لديك حساب؟ سجل دخول"}

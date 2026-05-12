@@ -30,10 +30,35 @@
 }
 
 .owner-orders__hint {
-  margin: 0 0 var(--dm-space-4);
+  margin: 0 0 var(--dm-space-3);
   font-size: 0.92rem;
   color: var(--dm-color-text-muted);
   line-height: 1.75;
+}
+
+.owner-orders__store-badge {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-width: 260px;
+  padding: var(--dm-space-3);
+  border-radius: var(--dm-radius-md);
+  border: 1px solid var(--dm-color-border);
+  background: var(--dm-color-bg);
+  font-size: 0.82rem;
+  color: var(--dm-color-text-muted);
+}
+
+.owner-orders__store-badge strong {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--dm-color-text);
+  letter-spacing: 0.02em;
+}
+
+.owner-orders__store-badge small {
+  font-size: 0.72rem;
+  opacity: 0.9;
 }
 
 .owner-orders__hint code {
