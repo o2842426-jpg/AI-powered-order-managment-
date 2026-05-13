@@ -610,6 +610,23 @@ export function OwnerDashboardPage({
   async function createVariant() {
     if (!selectedProductId) return;
 
+    const stockRaw = String(variantDraft.stock_qty ?? "").trim();
+    const stock = stockRaw === "" ? NaN : Number(stockRaw);
+    if (!Number.isInteger(stock) || stock < 0) {
+      setDashboardMsg("أدخل كمية مخزون صحيحة (رقم صحيح ≥ 0) لهذا الخيار.");
+      return;
+    }
+
+    let pricePayload = null;
+    if (variantDraft.price !== "" && variantDraft.price != null) {
+      const p = Number(variantDraft.price);
+      if (Number.isNaN(p) || p < 0) {
+        setDashboardMsg("السعر الاختياري غير صالح.");
+        return;
+      }
+      pricePayload = p;
+    }
+
     setVariantSaving(true);
     setDashboardMsg("");
 
@@ -620,8 +637,11 @@ export function OwnerDashboardPage({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ...variantDraft,
-            stock_qty: Number(variantDraft.stock_qty),
+            size: String(variantDraft.size ?? "").trim() || null,
+            color: String(variantDraft.color ?? "").trim() || null,
+            price: pricePayload,
+            stock_qty: stock,
+            sku: String(variantDraft.sku ?? "").trim() || null,
           }),
         }
       );
@@ -780,6 +800,11 @@ export function OwnerDashboardPage({
     showTrialBanner && billingStatus?.trial_ends_at != null
       ? trialCalendarDaysLeft(billingStatus.trial_ends_at)
       : null;
+
+  const newVariantStockDraft = String(variantDraft.stock_qty ?? "").trim();
+  const newVariantStockNum = newVariantStockDraft === "" ? NaN : Number(newVariantStockDraft);
+  const newVariantStockValid =
+    Number.isInteger(newVariantStockNum) && newVariantStockNum >= 0;
 
   return (
     <div className="owner-dashboard">
@@ -1483,6 +1508,10 @@ export function OwnerDashboardPage({
       <section className="owner-dashboard__grid">
         <article className="owner-dashboard__card" id="add-product">
           <h2>إضافة منتج</h2>
+          <p className="owner-dashboard__muted owner-dashboard__muted--tight">
+            أنشئ المنتج بالاسم والسعر الأساسي. الخيارات (أكثر من مواصفة أو مخزون منفصل){" "}
+            <strong>اختيارية</strong> — تضيفها لاحقًا من «تعديل» دون أن يمنعك النظام.
+          </p>
           <label>
             الاسم
             <input
@@ -1650,7 +1679,8 @@ export function OwnerDashboardPage({
           <article className="owner-dashboard__card">
             <h2>تعديل المنتج</h2>
             <p className="owner-dashboard__muted">
-              هنا تعدل معلومات المنتج التي يراها العميل في المتجر.
+              هنا تعدل معلومات المنتج التي يراها العميل في المتجر. خيارات المواصفات والمخزون في البطاقة
+              التالية <strong>اختيارية</strong>.
             </p>
             <label>
               الاسم
@@ -1740,14 +1770,22 @@ export function OwnerDashboardPage({
             </button>
           </article>
 
-          <article className="owner-dashboard__card">
-            <h2>خيارات المنتج (مواصفات ومخزون)</h2>
+          <article className="owner-dashboard__card owner-dashboard__card--optional-options">
+            <h2>خيارات المنتج (اختياري)</h2>
             <p className="owner-dashboard__muted">
-              استخدم خيارات المنتج لأي فئة: سعة، لون، نكهة، إصدار، عبوة، أو أي مواصفتين تناسب منتجك — مع أسعار أو مخزون مختلف عند الحاجة.
+              استخدم هذا القسم فقط إذا كان منتجك يتضمن أكثر من شكل: سعة، لون، نكهة، تخزين، إصدار،
+              وزن، مادة، عبوة… يمكن ترك المواصفة 1 و 2 فارغين إذا كان الخيار يُعرّف بالمخزون أو الـ SKU
+              فقط.
             </p>
+            <p className="owner-dashboard__muted owner-dashboard__muted--tight">
+              إن لم تضف أي خيار، يبقى المنتج <strong>بسيطًا</strong>: يظهر للعميل بالسعر الأساسي دون خطوة
+              اختيار في المتجر.
+            </p>
+
+            <h3 className="owner-dashboard__options-subtitle">إضافة خيار جديد</h3>
             <div className="owner-dashboard__compact-grid">
               <label>
-                مواصفة 1 (مثل السعة، الحجم، النكهة…)
+                مواصفة 1 (اختياري — مثل السعة، الحجم، النكهة…)
                 <input
                   value={variantDraft.size}
                   onChange={(event) =>
@@ -1756,7 +1794,7 @@ export function OwnerDashboardPage({
                 />
               </label>
               <label>
-                مواصفة 2 (مثل اللون، الإصدار، العبوة…)
+                مواصفة 2 (اختياري — مثل اللون، الإصدار، العبوة…)
                 <input
                   value={variantDraft.color}
                   onChange={(event) =>
@@ -1765,7 +1803,7 @@ export function OwnerDashboardPage({
                 />
               </label>
               <label>
-                السعر
+                سعر الخيار (اختياري — يُستخدم بدل السعر الأساسي عند التعبئة)
                 <input
                   type="number"
                   min="0"
@@ -1776,10 +1814,11 @@ export function OwnerDashboardPage({
                 />
               </label>
               <label>
-                المخزون
+                المخزون <span className="owner-dashboard__req">*</span>
                 <input
                   type="number"
                   min="0"
+                  step="1"
                   value={variantDraft.stock_qty}
                   onChange={(event) =>
                     setVariantDraft({
@@ -1790,7 +1829,7 @@ export function OwnerDashboardPage({
                 />
               </label>
               <label>
-                SKU
+                SKU (اختياري)
                 <input
                   value={variantDraft.sku}
                   onChange={(event) =>
@@ -1799,143 +1838,145 @@ export function OwnerDashboardPage({
                 />
               </label>
             </div>
-            <button type="button" onClick={createVariant} disabled={variantSaving}>
-              إنشاء الخيار
+            <button
+              type="button"
+              onClick={createVariant}
+              disabled={variantSaving || !newVariantStockValid}
+            >
+              {variantSaving ? "جاري الحفظ..." : "إضافة خيار"}
             </button>
+
+            <h3 className="owner-dashboard__options-subtitle">الخيارات الحالية</h3>
+            {variantsLoading && <p className="owner-dashboard__muted">جاري التحميل...</p>}
+            {!variantsLoading && variants.length === 0 && (
+              <p className="owner-dashboard__muted">
+                لا توجد خيارات بعد — المنتج يُعرض كمنتج بسيط بالسعر الأساسي. أضف خيارًا عند الحاجة
+                لتعدد المواصفات أو لتتبّع مخزون أدق.
+              </p>
+            )}
+            {variants.length > 0 && (
+              <div className="owner-dashboard__variant-grid">
+                {variants.map((variant, index) => {
+                  const stock = Number(variant.stock_qty);
+                  const isLowStock = stock > 0 && stock <= 3;
+                  const isOutOfStock = stock === 0;
+                  const isHidden = variant.is_active === 0;
+
+                  return (
+                    <article
+                      key={variant.id}
+                      className={
+                        isHidden
+                          ? "owner-dashboard__variant-card is-hidden"
+                          : isOutOfStock
+                            ? "owner-dashboard__variant-card is-out"
+                            : isLowStock
+                              ? "owner-dashboard__variant-card is-low"
+                              : "owner-dashboard__variant-card"
+                      }
+                    >
+                      <div className="owner-dashboard__variant-head">
+                        <div>
+                          <span>الخيار #{variant.id}</span>
+                          <strong>{formatProductOptionSummary(variant)}</strong>
+                        </div>
+                        <em>
+                          {isHidden
+                            ? "مخفي"
+                            : isOutOfStock
+                              ? "نفد"
+                              : isLowStock
+                                ? "منخفض"
+                                : "متوفر"}
+                        </em>
+                      </div>
+
+                      <div className="owner-dashboard__variant-fields">
+                        <label>
+                          مواصفة 1
+                          <input
+                            value={variant.size || ""}
+                            onChange={(event) =>
+                              updateVariantDraft(index, "size", event.target.value)
+                            }
+                          />
+                        </label>
+                        <label>
+                          مواصفة 2
+                          <input
+                            value={variant.color || ""}
+                            onChange={(event) =>
+                              updateVariantDraft(index, "color", event.target.value)
+                            }
+                          />
+                        </label>
+                        <label>
+                          السعر
+                          <input
+                            type="number"
+                            min="0"
+                            value={variant.price ?? ""}
+                            onChange={(event) =>
+                              updateVariantDraft(index, "price", event.target.value)
+                            }
+                          />
+                        </label>
+                        <label>
+                          المخزون
+                          <input
+                            type="number"
+                            min="0"
+                            value={variant.stock_qty}
+                            onChange={(event) =>
+                              updateVariantDraft(index, "stock_qty", event.target.value)
+                            }
+                          />
+                        </label>
+                        <label>
+                          SKU
+                          <input
+                            value={variant.sku || ""}
+                            onChange={(event) =>
+                              updateVariantDraft(index, "sku", event.target.value)
+                            }
+                          />
+                        </label>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => saveVariant(variant)}
+                        disabled={variantSaving}
+                      >
+                        حفظ الخيار
+                      </button>
+                      <div className="owner-dashboard__variant-actions">
+                        <button
+                          type="button"
+                          className="is-secondary"
+                          onClick={() => updateVariantVisibility(variant, !variant.is_active)}
+                          disabled={variantSaving}
+                        >
+                          {isHidden ? "إظهار الخيار" : "إخفاء الخيار"}
+                        </button>
+                        <button
+                          type="button"
+                          className="is-danger"
+                          onClick={() => archiveVariant(variant)}
+                          disabled={variantSaving || isHidden}
+                        >
+                          أرشفة
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </article>
         </section>
       )}
 
-      {selectedProductId && (
-        <section className="owner-dashboard__card">
-          <h2>خيارات المنتج المحدد</h2>
-          {variantsLoading && <p className="owner-dashboard__muted">جاري التحميل...</p>}
-          {!variantsLoading && variants.length === 0 && (
-            <p className="owner-dashboard__muted">لا توجد خيارات بعد.</p>
-          )}
-          {variants.length > 0 && (
-            <div className="owner-dashboard__variant-grid">
-              {variants.map((variant, index) => {
-                const stock = Number(variant.stock_qty);
-                const isLowStock = stock > 0 && stock <= 3;
-                const isOutOfStock = stock === 0;
-                const isHidden = variant.is_active === 0;
-
-                return (
-                  <article
-                    key={variant.id}
-                    className={
-                      isHidden
-                        ? "owner-dashboard__variant-card is-hidden"
-                        : isOutOfStock
-                        ? "owner-dashboard__variant-card is-out"
-                        : isLowStock
-                          ? "owner-dashboard__variant-card is-low"
-                          : "owner-dashboard__variant-card"
-                    }
-                  >
-                    <div className="owner-dashboard__variant-head">
-                      <div>
-                        <span>الخيار #{variant.id}</span>
-                        <strong>
-                          {formatProductOptionSummary(variant)}
-                        </strong>
-                      </div>
-                      <em>
-                        {isHidden
-                          ? "مخفي"
-                          : isOutOfStock
-                          ? "نفد"
-                          : isLowStock
-                            ? "منخفض"
-                            : "متوفر"}
-                      </em>
-                    </div>
-
-                    <div className="owner-dashboard__variant-fields">
-                      <label>
-                        مواصفة 1
-                        <input
-                          value={variant.size || ""}
-                          onChange={(event) =>
-                            updateVariantDraft(index, "size", event.target.value)
-                          }
-                        />
-                      </label>
-                      <label>
-                        مواصفة 2
-                        <input
-                          value={variant.color || ""}
-                          onChange={(event) =>
-                            updateVariantDraft(index, "color", event.target.value)
-                          }
-                        />
-                      </label>
-                      <label>
-                        السعر
-                        <input
-                          type="number"
-                          min="0"
-                          value={variant.price ?? ""}
-                          onChange={(event) =>
-                            updateVariantDraft(index, "price", event.target.value)
-                          }
-                        />
-                      </label>
-                      <label>
-                        المخزون
-                        <input
-                          type="number"
-                          min="0"
-                          value={variant.stock_qty}
-                          onChange={(event) =>
-                            updateVariantDraft(index, "stock_qty", event.target.value)
-                          }
-                        />
-                      </label>
-                      <label>
-                        SKU
-                        <input
-                          value={variant.sku || ""}
-                          onChange={(event) =>
-                            updateVariantDraft(index, "sku", event.target.value)
-                          }
-                        />
-                      </label>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => saveVariant(variant)}
-                      disabled={variantSaving}
-                    >
-                      حفظ الخيار
-                    </button>
-                    <div className="owner-dashboard__variant-actions">
-                      <button
-                        type="button"
-                        className="is-secondary"
-                        onClick={() => updateVariantVisibility(variant, !variant.is_active)}
-                        disabled={variantSaving}
-                      >
-                        {isHidden ? "إظهار الخيار" : "إخفاء الخيار"}
-                      </button>
-                      <button
-                        type="button"
-                        className="is-danger"
-                        onClick={() => archiveVariant(variant)}
-                        disabled={variantSaving || isHidden}
-                      >
-                        أرشفة
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      )}
       </>
       )}
 

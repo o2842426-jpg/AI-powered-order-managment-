@@ -1307,6 +1307,25 @@
   line-height: 1.55;
 }
 
+.owner-dashboard__card--optional-options {
+  border: 1px dashed rgba(109, 94, 249, 0.35);
+  background: color-mix(in srgb, var(--dm-color-primary) 4%, var(--dm-color-surface));
+}
+
+.owner-dashboard__options-subtitle {
+  margin: var(--dm-space-4) 0 var(--dm-space-2);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--dm-color-text);
+  letter-spacing: -0.01em;
+}
+
+.owner-dashboard__req {
+  color: #b91c1c;
+  font-weight: 700;
+  font-size: 0.85em;
+}
+
 .owner-dashboard__ai-presets {
   display: flex;
   flex-wrap: wrap;
