@@ -433,12 +433,19 @@ async function sendChatMessage(req ,res){
     }
 
     const storeQuery = db.prepare(`
-      SELECT id, name, slug
-FROM stores
-WHERE slug = ?
-      `)
+      SELECT
+        id,
+        name,
+        slug,
+        ai_prompt,
+        delivery_info,
+        policy_text,
+        subscription_status
+      FROM stores
+      WHERE slug = ?
+    `);
 
-      const store = storeQuery.get(storeSlug);
+    const store = storeQuery.get(storeSlug);
 
       if(!store){
         return res.status(404).json({message:"Store not found."})

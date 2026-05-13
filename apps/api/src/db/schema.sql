@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS stores (
   stripe_customer_id TEXT,
   stripe_subscription_id TEXT,
   subscription_current_period_end TEXT,
+  trial_started_at TEXT,
+  trial_ends_at TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

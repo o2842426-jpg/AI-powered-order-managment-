@@ -3,21 +3,21 @@ import "./App.css";
 import { OwnerShell } from "./components/OwnerShell";
 import { authFetch, clearAuth, getStoredAuth, storeAuth } from "./lib/auth";
 import { rememberPublicStoreSlug } from "./lib/publicStoreSlug";
+import {
+  OWNER_APP_VIEWS,
+  OWNER_URL_SYNC_VIEWS,
+  computeInitialPostLoginView,
+  computeInitialView,
+  replaceOwnerUrlParam,
+} from "./lib/ownerViewUrl";
 import { OwnerDashboardPage } from "./pages/OwnerDashboardPage";
 import { OwnerLoginPage } from "./pages/OwnerLoginPage";
 import { OwnerOrdersPage } from "./pages/OwnerOrdersPage";
 import { CreateStorePage } from "./pages/CreateStorePage";
 import { StorefrontPage } from "./pages/StorefrontPage";
-
-const OWNER_APP_VIEWS = new Set([
-  "dashboard",
-  "orders",
-  "products",
-  "inventory",
-  "customers",
-  "ai",
-  "settings",
-]);
+import { OwnerUpgradePage } from "./pages/OwnerUpgradePage";
+import { SuperAdminLoginPage } from "./pages/SuperAdminLoginPage";
+import { SuperAdminPage } from "./pages/SuperAdminPage";
 
 function dashboardPanelFromView(v) {
   const map = {
@@ -32,11 +32,11 @@ function dashboardPanelFromView(v) {
 }
 
 function App() {
-  const [view, setView] = useState("store");
+  const [view, setView] = useState(() => computeInitialView());
   const [ownerAuth, setOwnerAuth] = useState(() => getStoredAuth());
   const [billingStatus, setBillingStatus] = useState(null);
   const [billingRefresh, setBillingRefresh] = useState(0);
-  const [postLoginView, setPostLoginView] = useState("dashboard");
+  const [postLoginView, setPostLoginView] = useState(() => computeInitialPostLoginView());
   const [orderSearch, setOrderSearch] = useState("");
 
   useEffect(() => {
@@ -84,6 +84,16 @@ function App() {
   }, [ownerAuth, billingRefresh]);
 
   useEffect(() => {
+    if (
+      view === "upgrade" &&
+      billingStatus?.billing_enforced &&
+      billingStatus?.has_access
+    ) {
+      setView("dashboard");
+    }
+  }, [view, billingStatus?.billing_enforced, billingStatus?.has_access]);
+
+  useEffect(() => {
     const u = ownerAuth?.user;
     if (!u?.store_id || u.store_slug) return;
     let cancelled = false;
@@ -114,6 +124,48 @@ function App() {
       setOrderSearch("");
     }
   }, [view]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (view === "super-admin-login" || view === "super-admin") {
+      replaceOwnerUrlParam(view);
+      return;
+    }
+
+    const mustSeeUpgrade =
+      ownerAuth &&
+      billingStatus &&
+      billingStatus.billing_enforced &&
+      billingStatus.has_access === false &&
+      (OWNER_APP_VIEWS.has(view) || view === "upgrade");
+    if (mustSeeUpgrade) {
+      replaceOwnerUrlParam("upgrade");
+      return;
+    }
+
+    const shellLoggedIn =
+      ownerAuth &&
+      view !== "store" &&
+      view !== "owner-login" &&
+      view !== "create-store" &&
+      view !== "super-admin-login" &&
+      view !== "super-admin";
+    if (shellLoggedIn && OWNER_URL_SYNC_VIEWS.has(view)) {
+      replaceOwnerUrlParam(view);
+      return;
+    }
+
+    if (view === "owner-login") {
+      const o = new URLSearchParams(window.location.search).get("owner");
+      if (o === "upgrade") return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("owner")) {
+      replaceOwnerUrlParam(null);
+    }
+  }, [view, ownerAuth, billingStatus]);
 
   function openOwnerView(nextView) {
     if (!ownerAuth) {
@@ -165,13 +217,13 @@ function App() {
     }
   }
 
-  const ownerLocked =
-    Boolean(ownerAuth) &&
-    Boolean(billingStatus?.billing_enforced) &&
-    billingStatus?.has_access === false &&
-    OWNER_APP_VIEWS.has(view);
-
-  const showOwnerShell = ownerAuth && view !== "store" && view !== "owner-login";
+  const showOwnerShell =
+    ownerAuth &&
+    view !== "store" &&
+    view !== "owner-login" &&
+    view !== "create-store" &&
+    view !== "super-admin-login" &&
+    view !== "super-admin";
 
   const billingToolbar =
     ownerAuth &&
@@ -185,28 +237,42 @@ function App() {
       </div>
     ) : null;
 
-  const billingBannerEl =
-    ownerLocked ? (
-      <div className="app-billing-banner" role="alert">
-        <div>
-          <strong>يتطلب اشتراكًا لاستخدام لوحة المالك</strong>
-          <p>
-            حالة الاشتراك الحالية:{" "}
-            <em>{billingStatus?.subscription_status ?? "غير معروف"}</em>. أكمل الاشتراك
-            للوصول إلى الطلبات والمنتجات والإعدادات.
-          </p>
-        </div>
-        <button type="button" className="app-billing-cta" onClick={startCheckout}>
-          اشترك الآن
-        </button>
-      </div>
-    ) : null;
+  const billingBannerEl = null;
+
+  const upgradeNavActive =
+    view === "upgrade" ||
+    (ownerAuth &&
+      billingStatus?.billing_enforced &&
+      billingStatus?.has_access === false &&
+      OWNER_APP_VIEWS.has(view));
 
   function renderOwnerMain() {
     if (!ownerAuth) return null;
 
-    if (ownerLocked) {
-      return null;
+    const mustSeeUpgrade =
+      Boolean(billingStatus?.billing_enforced) &&
+      billingStatus?.has_access === false &&
+      (view === "upgrade" || OWNER_APP_VIEWS.has(view));
+
+    if (mustSeeUpgrade) {
+      return (
+        <OwnerUpgradePage
+          billingStatus={billingStatus}
+          onStartCheckout={startCheckout}
+          onPreviewStore={() => setView("store")}
+        />
+      );
+    }
+
+    if (view === "upgrade") {
+      return (
+        <div className="page" style={{ padding: "2rem", textAlign: "center" }}>
+          <p>الفوترة غير مفعّلة أو اشتراكك نشط بالفعل.</p>
+          <button type="button" className="dm-btn dm-btn--primary" onClick={() => setView("dashboard")}>
+            العودة للوحة التحكم
+          </button>
+        </div>
+      );
     }
 
     if (view === "orders") {
@@ -240,12 +306,14 @@ function App() {
               customers: "customers",
               ai: "ai",
               settings: "settings",
+              upgrade: "upgrade",
             };
             const next = map[target];
             if (next) setView(next);
           }}
           onGoToOrders={() => setView("orders")}
           onPreviewStore={() => setView("store")}
+          billingStatus={billingStatus}
         />
       );
     }
@@ -280,6 +348,17 @@ function App() {
       >
         دخول المالك
       </button>
+      <button
+        type="button"
+        className={
+          view === "super-admin-login" || view === "super-admin"
+            ? "app-public-nav__btn is-active"
+            : "app-public-nav__btn"
+        }
+        onClick={() => setView("super-admin-login")}
+      >
+        إدارة المنصة
+      </button>
     </nav>
   ) : null;
 
@@ -288,6 +367,7 @@ function App() {
       {showOwnerShell ? (
         <OwnerShell
           activeView={view}
+          upgradeNavActive={upgradeNavActive}
           onNavigate={(id) => openOwnerView(id)}
           billingStatus={billingStatus}
           onLogout={logoutOwner}
@@ -304,6 +384,27 @@ function App() {
         <main className="page page--public">
           {publicNav}
 
+          {view === "super-admin-login" && (
+            <SuperAdminLoginPage
+              onSuccess={() => {
+                setView("super-admin");
+                replaceOwnerUrlParam("super-admin");
+              }}
+              onBack={() => {
+                setView("store");
+                replaceOwnerUrlParam(null);
+              }}
+            />
+          )}
+          {view === "super-admin" && (
+            <SuperAdminPage
+              onExit={() => {
+                setView("super-admin-login");
+                replaceOwnerUrlParam("super-admin-login");
+              }}
+            />
+          )}
+
           {ownerAuth &&
             billingStatus?.billing_enforced &&
             billingStatus?.has_access &&
@@ -314,22 +415,6 @@ function App() {
                 </button>
               </div>
             )}
-
-          {ownerLocked && (
-            <div className="app-billing-banner" role="alert">
-              <div>
-                <strong>يتطلب اشتراكًا لاستخدام لوحة المالك</strong>
-                <p>
-                  حالة الاشتراك الحالية:{" "}
-                  <em>{billingStatus?.subscription_status ?? "غير معروف"}</em>. أكمل الاشتراك
-                  للوصول إلى الطلبات والمنتجات والإعدادات.
-                </p>
-              </div>
-              <button type="button" className="app-billing-cta" onClick={startCheckout}>
-                اشترك الآن
-              </button>
-            </div>
-          )}
 
           {ownerAuth && view === "store" && (
             <div className="app-owner-preview-bar">

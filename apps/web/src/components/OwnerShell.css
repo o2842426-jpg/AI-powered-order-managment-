@@ -105,6 +105,46 @@
   border-top: 1px solid var(--dm-color-border);
 }
 
+.owner-shell__upgrade-link {
+  min-height: 44px;
+  padding: 0 var(--dm-space-3);
+  border-radius: 14px;
+  border: 1px solid rgba(109, 94, 249, 0.45);
+  background: linear-gradient(135deg, rgba(109, 94, 249, 0.12), rgba(109, 94, 249, 0.06));
+  color: var(--dm-color-primary);
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.owner-shell__upgrade-link.is-active {
+  border-color: rgba(109, 94, 249, 0.75);
+  box-shadow: 0 0 0 2px rgba(109, 94, 249, 0.2);
+  background: linear-gradient(135deg, rgba(109, 94, 249, 0.22), rgba(109, 94, 249, 0.1));
+}
+
+.owner-shell__upgrade-link:hover {
+  filter: brightness(1.03);
+  box-shadow: 0 6px 18px rgba(109, 94, 249, 0.2);
+}
+
+.owner-shell__admin-sublink {
+  align-self: stretch;
+  padding: 0.35rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--dm-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.owner-shell__admin-sublink:hover {
+  color: var(--dm-color-primary);
+}
+
 .owner-shell__preview {
   min-height: 44px;
   padding: 0 var(--dm-space-3);

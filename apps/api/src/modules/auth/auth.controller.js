@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { db } = require("../../db/client");
+const { TRIAL_DAYS } = require("../billing/billing.access");
 
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
 
@@ -239,15 +240,23 @@ function createStoreWithOwner(req, res) {
 
     let newUserId;
 
+    const trialStartedAt = new Date().toISOString();
+    const trialEndsAt = new Date(
+      Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000
+    ).toISOString();
+
     const runTx = db.transaction(() => {
       const storeResult = db
         .prepare(
           `
-            INSERT INTO stores (name, slug, phone, delivery_info)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO stores (
+              name, slug, phone, delivery_info,
+              subscription_status, trial_started_at, trial_ends_at
+            )
+            VALUES (?, ?, ?, ?, 'trial', ?, ?)
           `
         )
-        .run(name, slug, phoneStr || null, delivery);
+        .run(name, slug, phoneStr || null, delivery, trialStartedAt, trialEndsAt);
 
       const storeId = Number(storeResult.lastInsertRowid);
       const userResult = db

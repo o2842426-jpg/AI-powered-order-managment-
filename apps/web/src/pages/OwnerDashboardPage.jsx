@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { authFetch, getOwnerStoreIdFromAuth } from "../lib/auth";
+import { buildPublicStorefrontUrl } from "../lib/storefrontUrl";
 import "./OwnerDashboardPage.css";
 
 const EMPTY_PRODUCT = {
@@ -15,6 +16,24 @@ const EMPTY_VARIANT = {
   stock_qty: 0,
   sku: "",
 };
+
+const AI_STYLE_PRESETS = [
+  {
+    id: "warm",
+    label: "ودي ودافئ",
+    text: "تحدث بلهجة ودية ودافئة، رحب بالعميل، وكن متعاطفًا مع أسئلته دون إطالة.",
+  },
+  {
+    id: "concise",
+    label: "مختصر واحترافي",
+    text: "أجب بجمل قصيرة وواضحة، ركز على المنتج والسعر والتوصيل، وتجنب الحشو.",
+  },
+  {
+    id: "luxury",
+    label: "فاخر وراقٍ",
+    text: "استخدم صياغة أنيقة وهادئة تليق بعلامة راقية؛ تجنب المبالغة أو الألفاظ المبالغ فيها.",
+  },
+];
 
 /** يُستخدم إذا كان الـ API لا يزال يعيد ملخصًا بدون حقل analytics */
 const EMPTY_DASHBOARD_ANALYTICS = {
@@ -195,11 +214,33 @@ function OwnerIncomeChartCard({ incomeChart }) {
   );
 }
 
+function formatTrialEndsAr(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("ar", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function trialCalendarDaysLeft(iso) {
+  const endMs = Date.parse(String(iso));
+  if (Number.isNaN(endMs)) return null;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endDay = new Date(endMs);
+  endDay.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.ceil((endDay - startOfToday) / 86400000));
+}
+
 export function OwnerDashboardPage({
   panel = "overview",
   onNavigate,
   onGoToOrders,
   onPreviewStore,
+  billingStatus = null,
 }) {
   const storeId = getOwnerStoreIdFromAuth();
   const [settings, setSettings] = useState(null);
@@ -211,6 +252,7 @@ export function OwnerDashboardPage({
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMsg, setSettingsMsg] = useState("");
   const [settingsError, setSettingsError] = useState("");
+  const [publicLinkCopied, setPublicLinkCopied] = useState(false);
 
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(true);
@@ -716,6 +758,28 @@ export function OwnerDashboardPage({
   const showAi = panel === "ai";
   const showSettings = panel === "settings";
 
+  const publicStoreUrl = useMemo(() => {
+    const slug = settings?.slug != null ? String(settings.slug).trim() : "";
+    if (!slug) return "";
+    return buildPublicStorefrontUrl(slug);
+  }, [settings?.slug]);
+
+  const showTrialBanner =
+    Boolean(billingStatus?.billing_enforced) &&
+    Boolean(billingStatus?.has_access) &&
+    billingStatus?.access_reason === "in_trial" &&
+    Boolean(billingStatus?.trial_ends_at);
+
+  const trialEndsLabel =
+    showTrialBanner && billingStatus?.trial_ends_at
+      ? formatTrialEndsAr(billingStatus.trial_ends_at)
+      : "";
+
+  const trialDaysLeft =
+    showTrialBanner && billingStatus?.trial_ends_at != null
+      ? trialCalendarDaysLeft(billingStatus.trial_ends_at)
+      : null;
+
   return (
     <div className="owner-dashboard">
       {!storeId && (
@@ -782,6 +846,80 @@ export function OwnerDashboardPage({
           </div>
         </div>
       </section>
+
+      {showTrialBanner && (
+        <div className="owner-dashboard__trial-banner" role="status">
+          <div className="owner-dashboard__trial-banner-body">
+            <p className="owner-dashboard__trial-banner-title">فترة التجربة نشطة</p>
+            <p className="owner-dashboard__trial-banner-text">
+              {trialDaysLeft != null && (
+                <>
+                  متبقٍ تقريبًا <strong>{trialDaysLeft}</strong> يومًا تقويميًا حتى نهاية الفترة.
+                  {trialEndsLabel ? " " : ""}
+                </>
+              )}
+              {trialEndsLabel ? (
+                <>
+                  تنتهي الفترة في <strong dir="ltr">{trialEndsLabel}</strong>.
+                </>
+              ) : null}
+            </p>
+          </div>
+          <div className="owner-dashboard__trial-banner-actions">
+            <button
+              type="button"
+              className="dm-btn dm-btn--primary dm-btn--sm"
+              onClick={() => onNavigate?.("upgrade")}
+            >
+              خطط الاشتراك
+            </button>
+          </div>
+        </div>
+      )}
+
+      {publicStoreUrl ? (
+        <section className="owner-dashboard__public-link" aria-label="رابط المتجر العام">
+          <div className="owner-dashboard__public-link-head">
+            <div>
+              <p className="owner-dashboard__public-link-eyebrow">رابط المتجر</p>
+              <h2 className="owner-dashboard__public-link-title">شارك متجرك مع الزبائن</h2>
+              <p className="owner-dashboard__public-link-hint">
+                يفتح واجهة المتجر العامة مع معرّف متجرك. انسخه في الواتساب، البايو، أو الإعلانات.
+              </p>
+            </div>
+          </div>
+          <div className="owner-dashboard__public-link-row">
+            <code className="owner-dashboard__public-link-url" dir="ltr">
+              {publicStoreUrl}
+            </code>
+            <div className="owner-dashboard__public-link-actions">
+              <button
+                type="button"
+                className="dm-btn dm-btn--secondary dm-btn--sm"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(publicStoreUrl);
+                    setPublicLinkCopied(true);
+                    window.setTimeout(() => setPublicLinkCopied(false), 2200);
+                  } catch {
+                    window.prompt("انسخ الرابط:", publicStoreUrl);
+                  }
+                }}
+              >
+                {publicLinkCopied ? "تم النسخ" : "نسخ الرابط"}
+              </button>
+              <a
+                className="dm-btn dm-btn--ghost dm-btn--sm"
+                href={publicStoreUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                فتح في تبويب جديد
+              </a>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {summaryError && <p className="owner-dashboard__error">{summaryError}</p>}
       {summary && (
@@ -1292,11 +1430,34 @@ export function OwnerDashboardPage({
           <p className="owner-dashboard__muted">
             وجّه أسلوب الرد والتوصيات التي يقدّمها المساعد لعملائك في المتجر والشات.
           </p>
+          {billingStatus?.billing_enforced ? (
+            <p className="owner-dashboard__muted owner-dashboard__muted--tight">
+              يختار الخادم نموذج الذكاء الاقتصادي أو الأقوى تلقائيًا حسب حالة اشتراك متجرك (نشط/تجربة).
+            </p>
+          ) : null}
           {settingsError && <p className="owner-dashboard__error">{settingsError}</p>}
           {settings && (
             <>
               <label>
                 تعليمات مساعد AI
+                <div className="owner-dashboard__ai-presets" aria-label="اقتراحات أسلوب سريعة">
+                  {AI_STYLE_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      className="dm-btn dm-btn--ghost dm-btn--sm"
+                      onClick={() => {
+                        const cur = String(settings.ai_prompt || "").trim();
+                        const next = cur
+                          ? `${cur}\n\n${preset.text}`
+                          : preset.text;
+                        setSettings({ ...settings, ai_prompt: next });
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
                 <textarea
                   rows={8}
                   value={settings.ai_prompt || ""}

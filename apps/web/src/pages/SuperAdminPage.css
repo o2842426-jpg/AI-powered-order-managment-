@@ -1,0 +1,128 @@
+.super-admin {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--dm-space-4, 1.25rem) var(--dm-space-3, 1rem) var(--dm-space-6, 2.5rem);
+}
+
+.super-admin__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--dm-space-3, 0.75rem);
+  margin-bottom: var(--dm-space-4, 1.25rem);
+}
+
+.super-admin__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.super-admin__sub {
+  margin: 0.25rem 0 0;
+  font-size: 0.88rem;
+  color: var(--dm-color-text-muted, #6b7280);
+}
+
+.super-admin__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dm-space-2, 0.5rem);
+}
+
+.super-admin__error {
+  padding: var(--dm-space-3, 0.75rem);
+  border-radius: var(--dm-radius-md, 10px);
+  background: rgba(239, 68, 68, 0.1);
+  color: #991b1b;
+  margin-bottom: var(--dm-space-3, 0.75rem);
+}
+
+.super-admin__table-wrap {
+  overflow-x: auto;
+  border-radius: var(--dm-radius-lg, 14px);
+  border: 1px solid var(--dm-color-border, #e5e7eb);
+  background: var(--dm-color-surface, #fff);
+}
+
+.super-admin__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.super-admin__table th,
+.super-admin__table td {
+  padding: 0.65rem 0.75rem;
+  text-align: right;
+  border-bottom: 1px solid var(--dm-color-border, #e5e7eb);
+  vertical-align: top;
+}
+
+.super-admin__table th {
+  font-weight: 700;
+  background: var(--dm-color-bg, #f9fafb);
+  white-space: nowrap;
+}
+
+.super-admin__slug {
+  font-size: 0.8rem;
+}
+
+.super-admin__link {
+  display: inline-block;
+  margin-inline-start: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.super-admin__email {
+  font-size: 0.8rem;
+  max-width: 10rem;
+  word-break: break-all;
+}
+
+.super-admin__mono {
+  font-size: 0.78rem;
+}
+
+.super-admin__select {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--dm-color-border, #e5e7eb);
+  max-width: 8rem;
+}
+
+.super-admin__row-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 10rem;
+}
+
+.super-admin__extend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.super-admin__extend input {
+  width: 3.5rem;
+  font: inherit;
+  padding: 0.3rem 0.4rem;
+  border-radius: 8px;
+  border: 1px solid var(--dm-color-border, #e5e7eb);
+}
+
+.super-admin__row-msg {
+  color: var(--dm-color-text-muted, #6b7280);
+}
+
+.super-admin__empty {
+  padding: var(--dm-space-4, 1.25rem);
+  margin: 0;
+  text-align: center;
+  color: var(--dm-color-text-muted, #6b7280);
+}

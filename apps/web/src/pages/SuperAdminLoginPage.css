@@ -1,0 +1,65 @@
+.super-admin-login {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: var(--dm-space-5, 2rem) var(--dm-space-3, 1rem);
+  min-height: 60vh;
+}
+
+.super-admin-login__card {
+  width: 100%;
+  max-width: 420px;
+  padding: var(--dm-space-5, 2rem);
+  border-radius: var(--dm-radius-lg, 16px);
+  background: var(--dm-color-surface, #fff);
+  border: 1px solid var(--dm-color-border, #e5e7eb);
+  box-shadow: var(--dm-shadow-card, 0 8px 30px rgba(0, 0, 0, 0.06));
+}
+
+.super-admin-login__title {
+  margin: 0 0 var(--dm-space-2, 0.5rem);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.super-admin-login__lead {
+  margin: 0 0 var(--dm-space-4, 1.25rem);
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--dm-color-text-muted, #6b7280);
+}
+
+.super-admin-login__lead code {
+  font-size: 0.82em;
+  background: var(--dm-color-bg, #f3f4f6);
+  padding: 0.1em 0.35em;
+  border-radius: 6px;
+}
+
+.super-admin-login__label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: var(--dm-space-3, 0.75rem);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.super-admin-login__label input {
+  font: inherit;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--dm-radius-md, 10px);
+  border: 1px solid var(--dm-color-border, #e5e7eb);
+}
+
+.super-admin-login__error {
+  margin: 0 0 var(--dm-space-3, 0.75rem);
+  font-size: 0.88rem;
+  color: #b91c1c;
+}
+
+.super-admin-login__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dm-space-2, 0.5rem);
+}

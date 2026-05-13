@@ -79,6 +79,7 @@ const ICONS = {
 
 export function OwnerShell({
   activeView,
+  upgradeNavActive = false,
   onNavigate,
   children,
   headerSearch,
@@ -129,6 +130,22 @@ export function OwnerShell({
         </nav>
 
         <div className="owner-shell__footer">
+          {billingStatus?.billing_enforced && billingStatus?.has_access === false && (
+            <button
+              type="button"
+              className={
+                upgradeNavActive
+                  ? "owner-shell__upgrade-link is-active"
+                  : "owner-shell__upgrade-link"
+              }
+              onClick={() => onNavigate?.("upgrade")}
+            >
+              خطط الاشتراك والترقية
+            </button>
+          )}
+          <button type="button" className="owner-shell__admin-sublink" onClick={() => onNavigate?.("super-admin-login")}>
+            إدارة المنصة
+          </button>
           <button type="button" className="owner-shell__preview" onClick={onPreviewStore}>
             معاينة المتجر
           </button>

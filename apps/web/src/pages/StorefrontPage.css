@@ -74,21 +74,11 @@
   transition: margin-bottom 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* الجوال: إخفاء الشريط العلوي بالكامل — بدون تحريك max-height (ثقيل على المعالج) */
+/* الجوال: لا نطوي الهيدر بـ max-height:0 (يغيّر scrollHeight ويكسر التمرير على iOS). */
 @media (max-width: 959px) {
   .storefront__topnav {
-    max-height: 720px;
-    overflow: hidden;
-    contain: layout paint;
+    overflow: visible;
     transition: none;
-  }
-
-  .storefront--nav-scroll-compact .storefront__topnav {
-    max-height: 0;
-    opacity: 0;
-    margin-bottom: 0;
-    pointer-events: none;
-    visibility: hidden;
   }
 }
 
@@ -527,7 +517,14 @@
   flex-direction: column;
   margin-top: var(--sf-space-2);
   padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-  min-height: min(70vh, calc(100dvh - 220px));
+  /* لا نفرض ارتفاعًا قريبًا من كامل الشاشة على الجوال — يتعارض مع تمرير الصفحة */
+  min-height: 0;
+}
+
+@media (min-width: 960px) {
+  .storefront__full-assistant {
+    min-height: min(70vh, calc(100dvh - 220px));
+  }
 }
 
 .storefront.storefront--cart-bar-visible .storefront__full-assistant {

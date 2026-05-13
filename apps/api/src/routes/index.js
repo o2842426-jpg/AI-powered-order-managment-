@@ -5,6 +5,7 @@ const { publicRouter } = require("../modules/public/public.routes");
 const { storesRouter } = require("../modules/stores/stores.routes");
 const { uploadsRouter } = require("../modules/uploads/uploads.routes");
 const { billingRouter } = require("../modules/billing/billing.routes");
+const { adminRouter } = require("../modules/admin/admin.routes");
 const apiRouter = express.Router();
 const { ordersRouter } = require("../modules/orders/orders.routes");
 apiRouter.get("/health", (_req, res) => {
@@ -12,6 +13,7 @@ apiRouter.get("/health", (_req, res) => {
 });
 
 apiRouter.use("/auth", authRouter);
+apiRouter.use("/admin", adminRouter);
 apiRouter.use("/billing", billingRouter);
 apiRouter.use("/products", productsRouter);
 apiRouter.use("/stores", storesRouter);

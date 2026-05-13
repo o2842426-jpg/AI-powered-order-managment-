@@ -4,6 +4,10 @@ const {
   isBillingEnforced,
   getFrontendBaseUrl,
 } = require("./billing.config");
+const {
+  hasOwnerToolAccess,
+  ownerAccessReason,
+} = require("./billing.access");
 
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -22,7 +26,9 @@ function getBillingStatus(req, res) {
           SELECT
             subscription_status,
             subscription_current_period_end,
-            stripe_customer_id
+            stripe_customer_id,
+            trial_started_at,
+            trial_ends_at
           FROM stores
           WHERE id = ?
         `
@@ -30,15 +36,17 @@ function getBillingStatus(req, res) {
       .get(req.user.store_id);
 
     const status = row?.subscription_status ?? "active";
-    const hasAccess =
-      !enforced || status === "active" || status === "trialing";
+    const hasAccess = !enforced || hasOwnerToolAccess(row || {});
 
     return res.status(200).json({
       data: {
         billing_enforced: enforced,
         subscription_status: status,
         has_access: hasAccess,
+        access_reason: ownerAccessReason(row || {}),
         current_period_end: row?.subscription_current_period_end ?? null,
+        trial_started_at: row?.trial_started_at ?? null,
+        trial_ends_at: row?.trial_ends_at ?? null,
         can_use_portal: Boolean(row?.stripe_customer_id),
       },
     });

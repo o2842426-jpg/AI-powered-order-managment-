@@ -59,6 +59,21 @@ function buildOwnerPrompt(store) {
   return prompt;
 }
 
+/**
+ * Paid Stripe statuses use OPENAI_MODEL_PAID (fallback OPENAI_MODEL).
+ * Trial / other statuses use OPENAI_MODEL_ECONOMY (fallback OPENAI_MODEL or gpt-4o-mini).
+ * @param {{ subscription_status?: string | null }} store
+ */
+function resolveChatModel(store) {
+  const status = String(store?.subscription_status || "active").toLowerCase();
+  const paidModel = String(process.env.OPENAI_MODEL_PAID || process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
+  const economyModel = String(process.env.OPENAI_MODEL_ECONOMY || process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
+  if (status === "active" || status === "trialing") {
+    return paidModel;
+  }
+  return economyModel;
+}
+
 async function generateStoreChatReply({
   store,
   products,
@@ -77,7 +92,7 @@ async function generateStoreChatReply({
     messageText
   );
 
-  const model = String(process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
+  const model = resolveChatModel(store);
   const tempRaw = process.env.OPENAI_TEMPERATURE;
   let temperature = 0.65;
   if (tempRaw !== undefined && String(tempRaw).trim() !== "") {
@@ -127,4 +142,5 @@ ${catalogText}`,
 
 module.exports = {
   generateStoreChatReply,
+  resolveChatModel,
 };

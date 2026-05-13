@@ -82,11 +82,6 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
   /** وضع الصفحة: مساعد بملء الشاشة أو المنتجات */
   const [pageMode, setPageMode] = useState("assistant");
 
-  /** على الجوال: إخفاء الشريط العلوي بالكامل عند التمرير لأسفل */
-  const [navScrollCompact, setNavScrollCompact] = useState(false);
-  const navScrollLastY = useRef(0);
-  const navCompactEmittedRef = useRef(false);
-
   const [chatSessionId, setChatSessionId] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatText, setChatText] = useState("");
@@ -157,70 +152,19 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
     setChatError("");
   }, [publicSlugVersion]);
 
+  /** مساحة إضافية أسفل منطقة التمرير فوق الشريط الثابت وزر التبديل (جوال). */
   useEffect(() => {
-    const mobileNavMq = () => window.innerWidth <= 959;
-    /** إظهار الشريط عندما يكون التمرير أعلى من أو يساوي هذا الارتفاع (قرب أعلى الصفحة) */
-    const NAV_SHOW_MAX_SCROLL_Y = 112;
-    /** لا يُخفى الشريط قبل تجاوز هذا الارتفاع لأسفل */
-    const NAV_HIDE_MIN_SCROLL_Y = 72;
-    /** بكسل: تمرير لأسفل بهذا المقدد أو أكثر يُخفي الشريط */
-    const NAV_SCROLL_DOWN_DELTA = 20;
-
-    let rafId = 0;
-    navCompactEmittedRef.current = false;
-
-    function applyScrollNavCompact() {
-      if (!mobileNavMq()) {
-        navScrollLastY.current = window.scrollY;
-        if (navCompactEmittedRef.current) {
-          navCompactEmittedRef.current = false;
-          setNavScrollCompact(false);
-        }
-        return;
-      }
-      const y = window.scrollY;
-      const prev = navScrollLastY.current;
-      let next = navCompactEmittedRef.current;
-
-      if (y <= NAV_SHOW_MAX_SCROLL_Y) {
-        next = false;
-      } else if (y >= NAV_HIDE_MIN_SCROLL_Y && y > prev + NAV_SCROLL_DOWN_DELTA) {
-        next = true;
-      }
-
-      navScrollLastY.current = y;
-      if (next !== navCompactEmittedRef.current) {
-        navCompactEmittedRef.current = next;
-        setNavScrollCompact(next);
-      }
-    }
-
-    function onScrollNavCompact() {
-      if (rafId) return;
-      rafId = window.requestAnimationFrame(() => {
-        rafId = 0;
-        applyScrollNavCompact();
-      });
-    }
-
-    function onResizeNavCompact() {
-      if (!mobileNavMq() && navCompactEmittedRef.current) {
-        navCompactEmittedRef.current = false;
-        setNavScrollCompact(false);
-      }
-      navScrollLastY.current = window.scrollY;
-    }
-
-    navScrollLastY.current = window.scrollY;
-    applyScrollNavCompact();
-    window.addEventListener("scroll", onScrollNavCompact, { passive: true });
-    window.addEventListener("resize", onResizeNavCompact);
+    const root = document.documentElement;
+    const prev = root.style.scrollPaddingBottom;
+    const pad =
+      cart.length > 0
+        ? "calc(112px + env(safe-area-inset-bottom, 0px))"
+        : "calc(88px + env(safe-area-inset-bottom, 0px))";
+    root.style.scrollPaddingBottom = pad;
     return () => {
-      window.removeEventListener("scroll", onScrollNavCompact);
-      window.removeEventListener("resize", onResizeNavCompact);
-      if (rafId) window.cancelAnimationFrame(rafId);
+      root.style.scrollPaddingBottom = prev;
     };
-  }, []);
+  }, [cart.length]);
 
   useEffect(() => {
     if (selectedProductId == null) {
@@ -1211,7 +1155,6 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
   const storefrontRootClass = [
     "storefront",
     `storefront--mode-${pageMode}`,
-    navScrollCompact ? "storefront--nav-scroll-compact" : "",
     cart.length > 0 ? "storefront--cart-bar-visible" : "",
   ]
     .filter(Boolean)
@@ -1333,8 +1276,8 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
 
       <div
         className="storefront__search-dock-mobile"
-        data-open={navScrollCompact ? "true" : "false"}
-        aria-hidden={!navScrollCompact}
+        data-open="false"
+        aria-hidden="true"
       >
         <StorefrontSearchField
           searchTerm={searchTerm}

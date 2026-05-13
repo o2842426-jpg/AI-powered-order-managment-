@@ -55,6 +55,12 @@ function ensureStoreSubscriptionColumns(db) {
       "ALTER TABLE stores ADD COLUMN subscription_current_period_end TEXT"
     );
   }
+  if (!columnNames.has("trial_started_at")) {
+    db.exec("ALTER TABLE stores ADD COLUMN trial_started_at TEXT");
+  }
+  if (!columnNames.has("trial_ends_at")) {
+    db.exec("ALTER TABLE stores ADD COLUMN trial_ends_at TEXT");
+  }
 }
 
 function ensureProductImageColumns(db) {
