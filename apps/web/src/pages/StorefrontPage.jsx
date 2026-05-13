@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiUrl } from "../lib/api";
 import { getEffectivePublicStoreSlug } from "../lib/publicStoreSlug";
+import { formatProductOptionSummary } from "../lib/productOptions";
 import "./StorefrontPage.css";
 
 const QUICK_CHAT_QUESTIONS = [
+  "هل المنتج متوفر؟",
+  "ما الخيارات المتاحة؟",
   "هل يوجد توصيل؟",
-  "كم السعر؟",
-  "ما المقاسات المتوفرة؟",
-  "ما المنتجات المتوفرة الآن؟",
-  "اقترح لي منتج مناسبًا",
+  "اعرض لي الأكثر مبيعًا",
+  "ماذا تنصح؟",
+  "ما السعر؟",
 ];
 
 function StorefrontSearchField({ searchTerm, onSearchChange, variant = "nav", inputId }) {
@@ -358,21 +360,6 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
   const cartCount = cart.reduce((s, x) => s + x.qty, 0);
   const cartTotal = cart.reduce((s, x) => s + x.unitPrice * x.qty, 0);
 
-  function matchesCategoryKeyword(product, kind) {
-    const t = `${product.name} ${product.description ?? ""}`.toLowerCase();
-    if (kind === "clothes") {
-      return /قميص|بنطلون|هودي|ملابس|تيشيرت|فستان|جاكيت|shirt|pants|hoodie|dress/i.test(
-        t
-      );
-    }
-    if (kind === "accessories") {
-      return /ساعة|حقيبة|اكسسوار|سلسلة|حزام|محفظة|نظارة|watch|bag|accessory/i.test(
-        t
-      );
-    }
-    return false;
-  }
-
   function productThumbUrl(productId) {
     const p = products.find((x) => x.id === productId);
     return p?.image_url ?? null;
@@ -389,10 +376,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
     const matchesFilter =
       productFilter === "all" ||
       (productFilter === "available" && hasStock) ||
-      (productFilter === "bestseller" && index === 0) ||
-      (productFilter === "clothes" && matchesCategoryKeyword(product, "clothes")) ||
-      (productFilter === "accessories" &&
-        matchesCategoryKeyword(product, "accessories"));
+      (productFilter === "bestseller" && index === 0);
 
     return matchesSearch && matchesFilter;
   });
@@ -585,7 +569,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
     );
 
     if (variants.length > 1) {
-      setChatError("هذا المنتج له أكثر من خيار. افتح التفاصيل لاختيار المقاس أو اللون.");
+      setChatError("هذا المنتج له أكثر من خيار. افتح التفاصيل لاختيار المواصفات المناسبة.");
       openProductFromChat(product.id);
       return;
     }
@@ -723,7 +707,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
         <div>
           <h2 className="storefront__ai-title">مساعد التسوق الذكي</h2>
           <p className="storefront__ai-sub">
-            اسأل عن المنتجات، الأسعار، التوصيل، والمقاسات — نجيبك بأسرع وقت.
+            اسأل عن المنتجات، الأسعار، الخيارات، والتوصيل — نجيبك بأسرع وقت.
           </p>
         </div>
         <div className="storefront__ai-online" aria-hidden>
@@ -1022,7 +1006,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                     <div className="storefront__pdp-section">
                       <div className="storefront__pdp-section-head">
                         <span className="storefront__pdp-section-kicker">الخيارات</span>
-                        <strong className="storefront__pdp-section-title">المقاس واللون</strong>
+                        <strong className="storefront__pdp-section-title">اختر الخيار المناسب</strong>
                       </div>
                       <div className="storefront__pdp-variant-grid">
                         {variants.map((variant) => {
@@ -1044,7 +1028,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                               onClick={() => setPickVariantId(variant.id)}
                             >
                               <span className="storefront__pdp-variant-line">
-                                {variant.size || "مقاس عام"} · {variant.color || "لون عام"}
+                                {formatProductOptionSummary(variant)}
                               </span>
                               <span className="storefront__pdp-variant-price">{variantPrice}</span>
                               <span className="storefront__pdp-variant-stock">
@@ -1062,7 +1046,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                   <div className="storefront__pdp-section">
                     <div className="storefront__pdp-section-head">
                       <span className="storefront__pdp-section-kicker">الكمية</span>
-                      <strong className="storefront__pdp-section-title">عدد القطع</strong>
+                      <strong className="storefront__pdp-section-title">الكمية</strong>
                     </div>
                     <div className="storefront__pdp-qty">
                       <button
@@ -1235,7 +1219,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
               type="button"
               className="storefront__nav-cart"
               onClick={scrollToCartSection}
-              aria-label={`السلة، ${cartCount} قطعة`}
+              aria-label={`السلة، ${cartCount} عنصر`}
             >
               <span className="storefront__nav-cart-icon" aria-hidden>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -1340,20 +1324,6 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                   </button>
                   <button
                     type="button"
-                    className={productFilter === "clothes" ? "is-active" : ""}
-                    onClick={() => setProductFilter("clothes")}
-                  >
-                    ملابس
-                  </button>
-                  <button
-                    type="button"
-                    className={productFilter === "accessories" ? "is-active" : ""}
-                    onClick={() => setProductFilter("accessories")}
-                  >
-                    اكسسوارات
-                  </button>
-                  <button
-                    type="button"
                     className={productFilter === "available" ? "is-active" : ""}
                     onClick={() => setProductFilter("available")}
                   >
@@ -1440,7 +1410,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                                   <ul className="storefront__variants-preview">
                                     {featuredProduct.variants.slice(0, 3).map((v) => (
                                       <li key={v.id}>
-                                        {v.size ?? "—"} · {v.color ?? "—"}
+                                        {formatProductOptionSummary(v)}
                                       </li>
                                     ))}
                                   </ul>
@@ -1531,7 +1501,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                                 <ul className="storefront__variants-preview">
                                   {p.variants.slice(0, 3).map((v) => (
                                     <li key={v.id}>
-                                      {v.size ?? "—"} · {v.color ?? "—"}
+                                      {formatProductOptionSummary(v)}
                                     </li>
                                   ))}
                                   {p.variants.length > 3 && <li>+{p.variants.length - 3} خيارات</li>}
@@ -1563,11 +1533,11 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                 <section className="storefront__hero-compact storefront__hero-compact--after-products">
                   <div className="storefront__hero-compact-copy">
                     <h2 className="storefront__hero-heading">
-                      منتجات مختارة وتسوق هادئ مع مساعد ذكي
+                      اكتشف منتجات المتجر وتسوّق بهدوء مع مساعد ذكي
                     </h2>
                     <p className="storefront__hero-lead">
                       {store?.delivery_info ||
-                        "نوافيك بالخيارات المناسبة ونساعدك تكمل طلبك بخطوات واضحة."}
+                        "نساعدك تختار الخيار المناسب وتكمل طلبك بخطوات واضحة."}
                     </p>
                     <ul className="storefront__hero-trust-inline">
                       <li>
@@ -1599,7 +1569,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                     <span className="storefront__feature-num">02</span>
                     <div>
                       <strong>خيارات واضحة</strong>
-                      <p>مقاس ولون وسعر متسق قبل الإضافة للسلة.</p>
+                      <p>مواصفات وسعر ومخزون واضحين قبل الإضافة للسلة.</p>
                     </div>
                   </article>
                   <article className="storefront__feature-card">
@@ -1696,7 +1666,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
               <p>خطوة أخيرة</p>
               <h2>تأكيد بيانات الطلب</h2>
             </div>
-            <span>{cartCount} قطعة</span>
+            <span>{cartCount} عنصر</span>
           </div>
           <div className="storefront__checkout-summary">
             <span>إجمالي تقريبي</span>
@@ -1777,7 +1747,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                   );
                 })}
               </div>
-              <span className="storefront__cart-bar-count">{cartCount} قطعة</span>
+              <span className="storefront__cart-bar-count">{cartCount} عنصر</span>
             </div>
             <div className="storefront__cart-bar-center">
               <small>الإجمالي</small>

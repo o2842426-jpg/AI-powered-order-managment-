@@ -324,8 +324,12 @@ function computeStoreAnalytics(db, storeId) {
     )
     .all(storeId);
 
-  const label = (row) =>
-    [row.size || "—", row.color || "—"].filter(Boolean).join(" · ");
+  const label = (row) => {
+    const parts = [row.size, row.color]
+      .map((x) => (x != null && String(x).trim() !== "" ? String(x).trim() : null))
+      .filter(Boolean);
+    return parts.length ? parts.join(" · ") : "—";
+  };
 
   const slowMovers = variantVelocity
     .filter((r) => Number(r.sold_30d) <= 1 && Number(r.stock_qty) >= 8)

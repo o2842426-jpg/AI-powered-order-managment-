@@ -403,8 +403,8 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
                 <thead>
                   <tr>
                     <th>المنتج</th>
-                    <th>المقاس</th>
-                    <th>اللون</th>
+                    <th>المواصفة 1</th>
+                    <th>المواصفة 2</th>
                     <th>SKU</th>
                     <th>الكمية</th>
                     <th>سعر الوحدة</th>

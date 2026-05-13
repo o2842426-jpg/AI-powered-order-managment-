@@ -96,7 +96,7 @@ export function CreateStorePage({ onDone, onBackToLogin }) {
           </label>
 
           <label>
-            رابط المتجر (إنجليزي، اختياري — مثل noor-style)
+            رابط المتجر (إنجليزي، اختياري — مثل my-brand)
             <input
               value={slug}
               onChange={(e) => setSlug(e.target.value)}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { authFetch, getOwnerStoreIdFromAuth } from "../lib/auth";
 import { buildPublicStorefrontUrl } from "../lib/storefrontUrl";
+import { formatProductOptionSummary } from "../lib/productOptions";
 import "./OwnerDashboardPage.css";
 
 const EMPTY_PRODUCT = {
@@ -734,8 +735,8 @@ export function OwnerDashboardPage({
       target: "products",
     },
     {
-      label: "أضف خيارات ومخزون",
-      hint: "المقاس، اللون، والكمية تجعل الطلب أدق.",
+      label: "أضف مواصفات خيارات المنتج والمخزون",
+      hint: "أضف مواصفات الخيارات والكمية لتكون الطلبات أوضح للعميل.",
       done: hasSelectedProductOptions,
       target: "products",
     },
@@ -952,7 +953,7 @@ export function OwnerDashboardPage({
               <div className="owner-dashboard__summary-body">
                 <div>
                   <span>مخزون منخفض</span>
-                  <small>3 قطع أو أقل</small>
+                  <small>3 وحدات مخزون أو أقل</small>
                 </div>
                 <strong>{summary.low_stock_variants}</strong>
               </div>
@@ -1250,7 +1251,7 @@ export function OwnerDashboardPage({
             <p className="owner-dashboard__eyebrow">Inventory Flow</p>
             <h2>مخزون يحتاج متابعة</h2>
             <p>
-              راجع الخيارات التي نفدت أو بقي منها 3 قطع أو أقل، ثم افتح المنتج
+              راجع الخيارات التي نفدت أو بقي منها 3 وحدات مخزون أو أقل، ثم افتح المنتج
               لتحديث الكمية بسرعة.
             </p>
           </div>
@@ -1290,7 +1291,7 @@ export function OwnerDashboardPage({
                     <div>
                       <strong>{item.product_name}</strong>
                       <small>
-                        {item.size || "بدون مقاس"} / {item.color || "بدون لون"}
+                        {formatProductOptionSummary(item)}
                       </small>
                     </div>
                   </div>
@@ -1366,7 +1367,7 @@ export function OwnerDashboardPage({
               )}
               <div className="owner-dashboard__compact-grid">
                 <label>
-                  لون المتجر الأساسي
+                  لون الواجهة الأساسي
                   <input
                     type="color"
                     value={settings.theme_color || "#4f46e5"}
@@ -1740,13 +1741,13 @@ export function OwnerDashboardPage({
           </article>
 
           <article className="owner-dashboard__card">
-            <h2>إضافة خيار / مخزون</h2>
+            <h2>خيارات المنتج (مواصفات ومخزون)</h2>
             <p className="owner-dashboard__muted">
-              استخدم الخيارات للمقاسات، الألوان، والأسعار المختلفة.
+              استخدم خيارات المنتج لأي فئة: سعة، لون، نكهة، إصدار، عبوة، أو أي مواصفتين تناسب منتجك — مع أسعار أو مخزون مختلف عند الحاجة.
             </p>
             <div className="owner-dashboard__compact-grid">
               <label>
-                المقاس
+                مواصفة 1 (مثل السعة، الحجم، النكهة…)
                 <input
                   value={variantDraft.size}
                   onChange={(event) =>
@@ -1755,7 +1756,7 @@ export function OwnerDashboardPage({
                 />
               </label>
               <label>
-                اللون
+                مواصفة 2 (مثل اللون، الإصدار، العبوة…)
                 <input
                   value={variantDraft.color}
                   onChange={(event) =>
@@ -1837,7 +1838,7 @@ export function OwnerDashboardPage({
                       <div>
                         <span>الخيار #{variant.id}</span>
                         <strong>
-                          {variant.size || "بدون مقاس"} / {variant.color || "بدون لون"}
+                          {formatProductOptionSummary(variant)}
                         </strong>
                       </div>
                       <em>
@@ -1853,7 +1854,7 @@ export function OwnerDashboardPage({
 
                     <div className="owner-dashboard__variant-fields">
                       <label>
-                        المقاس
+                        مواصفة 1
                         <input
                           value={variant.size || ""}
                           onChange={(event) =>
@@ -1862,7 +1863,7 @@ export function OwnerDashboardPage({
                         />
                       </label>
                       <label>
-                        اللون
+                        مواصفة 2
                         <input
                           value={variant.color || ""}
                           onChange={(event) =>
