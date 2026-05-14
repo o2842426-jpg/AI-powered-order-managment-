@@ -9,6 +9,7 @@ function migrate(db) {
   const schemaSql = fs.readFileSync(schemaPath, "utf8");
   db.exec(schemaSql);
   ensureStoreSettingsColumns(db);
+  ensureStoreCurrencyColumn(db);
   ensureStoreSubscriptionColumns(db);
   ensureProductImageColumns(db);
   ensureProductVariantActiveColumns(db);
@@ -34,6 +35,19 @@ function ensureStoreSettingsColumns(db) {
   if (!columnNames.has("policy_text")) {
     db.exec("ALTER TABLE stores ADD COLUMN policy_text TEXT");
   }
+}
+
+function ensureStoreCurrencyColumn(db) {
+  const columns = db.prepare("PRAGMA table_info(stores)").all();
+  const columnNames = new Set(columns.map((column) => column.name));
+  if (!columnNames.has("currency_code")) {
+    db.exec(
+      "ALTER TABLE stores ADD COLUMN currency_code TEXT DEFAULT 'SAR'"
+    );
+  }
+  db.prepare(
+    "UPDATE stores SET currency_code = 'SAR' WHERE currency_code IS NULL OR TRIM(currency_code) = ''"
+  ).run();
 }
 
 function ensureStoreSubscriptionColumns(db) {

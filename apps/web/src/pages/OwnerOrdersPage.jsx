@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { authFetch, getOwnerStoreIdFromAuth } from '../lib/auth';
+import { formatStoreMoney, normalizeStoreCurrencyCode } from '../lib/storeCurrency';
 import './OwnerOrdersPage.css';
 
 const ORDER_STATUSES = [
@@ -294,6 +295,9 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
     if (!orderDetail) return null;
 
     const whatsappUrl = getWhatsappUrl(orderDetail.order);
+    const detailCurrency = normalizeStoreCurrencyCode(
+      orderDetail.order?.store_currency_code
+    );
 
     return (
       <div className="owner-orders__detail" key={selectedOrderId}>
@@ -327,7 +331,7 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
             </div>
             <div>
               <dt>المبلغ</dt>
-              <dd>{orderDetail.order?.total_amount}</dd>
+              <dd>{formatStoreMoney(orderDetail.order?.total_amount, detailCurrency)}</dd>
             </div>
             <div>
               <dt>التاريخ</dt>
@@ -419,8 +423,8 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
                       <td>{it.variant_color ?? '—'}</td>
                       <td dir="ltr">{it.variant_sku ?? '—'}</td>
                       <td>{it.qty}</td>
-                      <td>{it.unit_price}</td>
-                      <td>{it.line_total}</td>
+                      <td>{formatStoreMoney(it.unit_price, detailCurrency)}</td>
+                      <td>{formatStoreMoney(it.line_total, detailCurrency)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -525,7 +529,13 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
                 </div>
 
                 <div className="owner-orders__meta">
-                  <span>الإجمالي: {row.total_amount}</span>
+                  <span>
+                    الإجمالي:{' '}
+                    {formatStoreMoney(
+                      row.total_amount,
+                      normalizeStoreCurrencyCode(row.store_currency_code)
+                    )}
+                  </span>
                   <span dir="ltr">{row.customer_phone ?? 'لا يوجد هاتف'}</span>
                   <span>{row.created_at ?? '—'}</span>
                 </div>

@@ -33,7 +33,8 @@ function listPublicProducts(req, res) {
         logo_url,
         theme_color,
         accent_color,
-        policy_text
+        policy_text,
+        currency_code
       FROM stores
       WHERE slug = ?
     `
@@ -117,7 +118,8 @@ function getSpecificProduct(req, res) {
         logo_url,
         theme_color,
         accent_color,
-        policy_text
+        policy_text,
+        currency_code
       FROM stores
       WHERE slug = ?
     `
@@ -372,7 +374,8 @@ function createChatSession(req ,res){
         logo_url,
         theme_color,
         accent_color,
-        policy_text
+        policy_text,
+        currency_code
 FROM stores
 WHERE slug = ?
       `)
@@ -440,7 +443,8 @@ async function sendChatMessage(req ,res){
         ai_prompt,
         delivery_info,
         policy_text,
-        subscription_status
+        subscription_status,
+        currency_code
       FROM stores
       WHERE slug = ?
     `);

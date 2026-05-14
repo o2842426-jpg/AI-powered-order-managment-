@@ -1,5 +1,14 @@
 const { db } = require("../../db/client");
 
+const STORE_CURRENCY_CODES = new Set(["SAR", "IQD", "USD"]);
+
+function normalizeStoreCurrencyCodeInput(raw) {
+  const c = String(raw ?? "SAR")
+    .trim()
+    .toUpperCase();
+  return STORE_CURRENCY_CODES.has(c) ? c : "SAR";
+}
+
 function roundMoney2(v) {
   return Math.round(Number(v) * 100) / 100;
 }
@@ -474,6 +483,7 @@ function getStoreSettings(req, res) {
             theme_color,
             accent_color,
             policy_text,
+            currency_code,
             created_at
           FROM stores
           WHERE id = ?
@@ -506,6 +516,7 @@ function updateStoreSettings(req, res) {
       theme_color,
       accent_color,
       policy_text,
+      currency_code,
     } = req.body;
 
     if (Number.isNaN(storeId) || storeId <= 0) {
@@ -518,12 +529,17 @@ function updateStoreSettings(req, res) {
     }
 
     const existingStore = db
-      .prepare("SELECT id FROM stores WHERE id = ?")
+      .prepare("SELECT id, currency_code FROM stores WHERE id = ?")
       .get(storeId);
 
     if (!existingStore) {
       return res.status(404).json({ message: "Store not found." });
     }
+
+    const mergedCurrency =
+      currency_code !== undefined && currency_code !== null
+        ? normalizeStoreCurrencyCodeInput(currency_code)
+        : normalizeStoreCurrencyCodeInput(existingStore.currency_code);
 
     if (!name || !String(name).trim()) {
       return res.status(400).json({ message: "name is required." });
@@ -540,7 +556,8 @@ function updateStoreSettings(req, res) {
           logo_url = ?,
           theme_color = ?,
           accent_color = ?,
-          policy_text = ?
+          policy_text = ?,
+          currency_code = ?
         WHERE id = ?
       `
     ).run(
@@ -552,6 +569,7 @@ function updateStoreSettings(req, res) {
       theme_color ? String(theme_color).trim() : null,
       accent_color ? String(accent_color).trim() : null,
       policy_text ? String(policy_text).trim() : null,
+      mergedCurrency,
       storeId
     );
 
@@ -569,6 +587,7 @@ function updateStoreSettings(req, res) {
             theme_color,
             accent_color,
             policy_text,
+            currency_code,
             created_at
           FROM stores
           WHERE id = ?

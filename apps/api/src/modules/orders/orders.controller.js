@@ -20,9 +20,11 @@ function listOrders(req, res) {
   o.total_amount,
   o.created_at,
   c.name AS customer_name,
-  c.phone AS customer_phone
+  c.phone AS customer_phone,
+  s.currency_code AS store_currency_code
 FROM orders o
 LEFT JOIN customers c ON c.id = o.customer_id
+JOIN stores s ON s.id = o.store_id
 WHERE o.store_id = ?
 ORDER BY o.id DESC
             `).all(storeId);
@@ -58,9 +60,11 @@ function getOrderById(req, res) {
   o.customer_note,
   o.created_at,
   c.name AS customer_name,
-  c.phone AS customer_phone
+  c.phone AS customer_phone,
+  s.currency_code AS store_currency_code
 FROM orders o
 LEFT JOIN customers c ON c.id = o.customer_id
+JOIN stores s ON s.id = o.store_id
 WHERE o.id = ? AND o.store_id = ?
             `).get(orderId, req.user.store_id);
 

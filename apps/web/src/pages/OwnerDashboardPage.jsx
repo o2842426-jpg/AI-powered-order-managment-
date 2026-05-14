@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { mediaUrl } from "../lib/api";
+import {
+  formatStoreMoney,
+  normalizeStoreCurrencyCode,
+  storeCurrencyOptionLabel,
+} from "../lib/storeCurrency";
 import { authFetch, getOwnerStoreIdFromAuth } from "../lib/auth";
 import { buildPublicStorefrontUrl } from "../lib/storefrontUrl";
 import { formatProductOptionSummary } from "../lib/productOptions";
@@ -1391,6 +1396,24 @@ export function OwnerDashboardPage({
                   <span>معاينة اللوجو</span>
                 </div>
               )}
+              <label>
+                عملة عرض الأسعار (واجهة المتجر والطلبات)
+                <select
+                  value={normalizeStoreCurrencyCode(settings.currency_code)}
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      currency_code: event.target.value,
+                    })
+                  }
+                >
+                  {["SAR", "IQD", "USD"].map((code) => (
+                    <option key={code} value={code}>
+                      {storeCurrencyOptionLabel(code)}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <div className="owner-dashboard__compact-grid">
                 <label>
                   لون الواجهة الأساسي
@@ -1570,7 +1593,7 @@ export function OwnerDashboardPage({
             />
           )}
           <label>
-            السعر الأساسي
+            السعر الأساسي ({storeCurrencyOptionLabel(settings?.currency_code)})
             <input
               type="number"
               min="0"
@@ -1641,7 +1664,12 @@ export function OwnerDashboardPage({
                   </div>
                   <p>{product.description || "لا يوجد وصف بعد."}</p>
                   <div className="owner-dashboard__product-meta">
-                    <strong>{product.base_price}</strong>
+                    <strong>
+                      {formatStoreMoney(
+                        product.base_price,
+                        settings?.currency_code
+                      )}
+                    </strong>
                     {!product.image_url && <span>أضف صورة لزيادة الثقة</span>}
                   </div>
                   <div className="owner-dashboard__product-actions">
@@ -1740,7 +1768,7 @@ export function OwnerDashboardPage({
               />
             )}
             <label>
-              السعر الأساسي
+              السعر الأساسي ({storeCurrencyOptionLabel(settings?.currency_code)})
               <input
                 type="number"
                 min="0"
@@ -1804,7 +1832,7 @@ export function OwnerDashboardPage({
                 />
               </label>
               <label>
-                سعر الخيار (اختياري — يُستخدم بدل السعر الأساسي عند التعبئة)
+                سعر الخيار (اختياري — {storeCurrencyOptionLabel(settings?.currency_code)})
                 <input
                   type="number"
                   min="0"
@@ -1912,7 +1940,7 @@ export function OwnerDashboardPage({
                           />
                         </label>
                         <label>
-                          السعر
+                          السعر ({storeCurrencyOptionLabel(settings?.currency_code)})
                           <input
                             type="number"
                             min="0"

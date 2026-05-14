@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS stores (
   theme_color TEXT,
   accent_color TEXT,
   policy_text TEXT,
+  currency_code TEXT DEFAULT 'SAR',
   subscription_status TEXT DEFAULT 'active',
   stripe_customer_id TEXT,
   stripe_subscription_id TEXT,

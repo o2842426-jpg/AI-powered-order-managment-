@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiUrl, mediaUrl } from "../lib/api";
+import { formatStoreMoney, normalizeStoreCurrencyCode } from "../lib/storeCurrency";
 import { getEffectivePublicStoreSlug } from "../lib/publicStoreSlug";
 import { formatProductOptionSummary } from "../lib/productOptions";
 import "./StorefrontPage.css";
@@ -359,6 +360,9 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
 
   const cartCount = cart.reduce((s, x) => s + x.qty, 0);
   const cartTotal = cart.reduce((s, x) => s + x.unitPrice * x.qty, 0);
+  const storeCurrency = normalizeStoreCurrencyCode(
+    productDetail?.store?.currency_code ?? store?.currency_code
+  );
 
   function productThumbUrl(productId) {
     const p = products.find((x) => x.id === productId);
@@ -771,7 +775,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                       : [];
                     const hasMultipleOptions = variants.length > 1;
                     const priceLabel = Number.isFinite(Number(product.base_price))
-                      ? `${Math.round(Number(product.base_price)).toLocaleString("en-US")} د.ع`
+                      ? formatStoreMoney(product.base_price, storeCurrency)
                       : String(product.base_price ?? "—");
 
                     return (
@@ -995,7 +999,9 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                       <div className="storefront__pdp-price-block">
                         <span className="storefront__pdp-price-label">السعر</span>
                         <div className="storefront__pdp-price-row">
-                          <strong className="storefront__pdp-price-value">{activePrice}</strong>
+                          <strong className="storefront__pdp-price-value">
+                            {formatStoreMoney(activePrice, storeCurrency)}
+                          </strong>
                           {selectedVariant && activeStock != null ? (
                             <span className="storefront__pdp-stock-hint">
                               متبقّي تقريبًا {activeStock}
@@ -1040,7 +1046,9 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                               <span className="storefront__pdp-variant-line">
                                 {formatProductOptionSummary(variant)}
                               </span>
-                              <span className="storefront__pdp-variant-price">{variantPrice}</span>
+                              <span className="storefront__pdp-variant-price">
+                                {formatStoreMoney(variantPrice, storeCurrency)}
+                              </span>
                               <span className="storefront__pdp-variant-stock">
                                 {unavailable
                                   ? "غير متوفر"
@@ -1090,7 +1098,10 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                       <p className="storefront__pdp-summary">
                         الإجمالي التقريبي:{" "}
                         <strong>
-                          {(Number(activePrice) * Number(addQty || 1)).toFixed(2)}
+                          {formatStoreMoney(
+                            Number(activePrice) * Number(addQty || 1),
+                            storeCurrency
+                          )}
                         </strong>
                       </p>
                     ) : null}
@@ -1414,7 +1425,9 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                               {featuredProduct.description && (
                                 <p className="storefront__desc">{featuredProduct.description}</p>
                               )}
-                              <p className="storefront__price">من {featuredProduct.base_price}</p>
+                              <p className="storefront__price">
+                                من {formatStoreMoney(featuredProduct.base_price, storeCurrency)}
+                              </p>
                               {Array.isArray(featuredProduct.variants) &&
                                 featuredProduct.variants.length > 0 && (
                                   <ul className="storefront__variants-preview">
@@ -1506,7 +1519,9 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                                 <h3>{p.name}</h3>
                               </div>
                               {p.description && <p className="storefront__desc">{p.description}</p>}
-                              <p className="storefront__price">من {p.base_price}</p>
+                              <p className="storefront__price">
+                                من {formatStoreMoney(p.base_price, storeCurrency)}
+                              </p>
                               {Array.isArray(p.variants) && p.variants.length > 0 && (
                                 <ul className="storefront__variants-preview">
                                   {p.variants.slice(0, 3).map((v) => (
@@ -1642,7 +1657,9 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
         >
           {cart.map((line, i) => (
             <li key={`${line.product_id}-${line.variant_id}-${i}`}>
-              <span>{line.title} — {(line.unitPrice * line.qty).toFixed(2)}</span>
+              <span>
+                {line.title} — {formatStoreMoney(line.unitPrice * line.qty, storeCurrency)}
+              </span>
               <div className="cart-line-actions">
                 <button type="button" onClick={() => decreaseLineQty(i)}>
                   -
@@ -1680,7 +1697,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
           </div>
           <div className="storefront__checkout-summary">
             <span>إجمالي تقريبي</span>
-            <strong>{cartTotal.toFixed(2)}</strong>
+            <strong>{formatStoreMoney(cartTotal, storeCurrency)}</strong>
             <small>سيتواصل المتجر معك لتأكيد التفاصيل والتوصيل.</small>
           </div>
           <div className="storefront__checkout-fields">
@@ -1761,7 +1778,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
             </div>
             <div className="storefront__cart-bar-center">
               <small>الإجمالي</small>
-              <strong>{cartTotal.toFixed(2)}</strong>
+              <strong>{formatStoreMoney(cartTotal, storeCurrency)}</strong>
             </div>
             <button
               type="button"
