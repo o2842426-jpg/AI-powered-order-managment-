@@ -463,9 +463,9 @@ if(!session){
 }
 
 const insertCustomerMessageQuery = db.prepare(
-  `INSERT INTO chat_messages (session_id, sender_type, message_text, intent)
-VALUES (?, 'customer', ?, NULL)`
-)
+  `INSERT INTO chat_messages (session_id, sender_type, message_text, intent, payload)
+VALUES (?, 'customer', ?, NULL, NULL)`
+);
 
 const customerMessageResult = insertCustomerMessageQuery.run(session.id, messageText);
 
@@ -510,19 +510,26 @@ const conversationMessages = db
   .all(session.id)
   .reverse();
 
-const aiReplyText = await generateStoreChatReply({
+const aiResult = await generateStoreChatReply({
   store,
   products,
   messageText,
   conversationMessages,
 });
 
-const insertAiMessageQuery  = db.prepare(`
-  INSERT INTO chat_messages (session_id, sender_type, message_text, intent)
-VALUES (?, 'ai', ?, 'ai_reply')
-  `)
+const aiReplyText = aiResult.reply;
+const recommendedIds = Array.isArray(aiResult.recommended_product_ids)
+  ? aiResult.recommended_product_ids
+  : [];
 
-  const  aiMessageResult = insertAiMessageQuery.run(session.id, aiReplyText);
+const payloadStr = JSON.stringify({ recommended_product_ids: recommendedIds });
+
+const insertAiMessageQuery = db.prepare(`
+  INSERT INTO chat_messages (session_id, sender_type, message_text, intent, payload)
+VALUES (?, 'ai', ?, 'ai_reply', ?)
+`);
+
+const aiMessageResult = insertAiMessageQuery.run(session.id, aiReplyText, payloadStr);
 
   const updateSessionQuery = db.prepare(`
     
@@ -534,13 +541,34 @@ updateSessionQuery.run(session.id);
 
 
 const latestMessagesQuery = db.prepare(`
-  SELECT id, session_id, sender_type, message_text, intent, created_at
+  SELECT id, session_id, sender_type, message_text, intent, payload, created_at
 FROM chat_messages
 WHERE session_id = ?
 ORDER BY id DESC
 LIMIT 2`);
 
-  const latestMessages = latestMessagesQuery.all(session.id).reverse();
+  const latestRows = latestMessagesQuery.all(session.id).reverse();
+
+  const latestMessages = latestRows.map((row) => {
+    const base = { ...row };
+    if (row.sender_type === "ai" && row.payload) {
+      try {
+        const p = JSON.parse(row.payload);
+        const ids = Array.isArray(p.recommended_product_ids) ? p.recommended_product_ids : [];
+        base.recommended_product_ids = ids;
+        base.recommended_products = ids
+          .map((id) => products.find((pr) => Number(pr.id) === Number(id)))
+          .filter(Boolean);
+      } catch {
+        base.recommended_product_ids = [];
+        base.recommended_products = [];
+      }
+    } else {
+      base.recommended_product_ids = [];
+      base.recommended_products = [];
+    }
+    return base;
+  });
 
   return res.status(201).json({
   message: "Message sent successfully.",
@@ -598,12 +626,55 @@ WHERE id = ? AND store_id = ?`
 
 
       const chat_messages = db.prepare(`
-        SELECT id, session_id, sender_type, message_text, intent, created_at
+        SELECT id, session_id, sender_type, message_text, intent, payload, created_at
 FROM chat_messages
 WHERE session_id = ?
 ORDER BY id ASC`)
 
-const messages = chat_messages.all(session.id)
+const rows = chat_messages.all(session.id)
+
+const messages = rows.map((row) => {
+  const base = { ...row };
+  if (row.sender_type === "ai" && row.payload) {
+    try {
+      const p = JSON.parse(row.payload);
+      const ids = Array.isArray(p.recommended_product_ids) ? p.recommended_product_ids : [];
+      base.recommended_product_ids = ids;
+      const storeProducts = db
+        .prepare(
+          `
+            SELECT id, name, description, image_url, base_price
+            FROM products
+            WHERE store_id = ? AND is_active = 1
+          `
+        )
+        .all(storeQ.id);
+      const withVariants = storeProducts.map((product) => {
+        const variants = db
+          .prepare(
+            `
+              SELECT id, product_id, size, color, price, stock_qty, sku
+              FROM product_variants
+              WHERE product_id = ? AND is_active = 1
+              ORDER BY id DESC
+            `
+          )
+          .all(product.id);
+        return { ...product, variants };
+      });
+      base.recommended_products = ids
+        .map((id) => withVariants.find((pr) => Number(pr.id) === Number(id)))
+        .filter(Boolean);
+    } catch {
+      base.recommended_product_ids = [];
+      base.recommended_products = [];
+    }
+  } else {
+    base.recommended_product_ids = [];
+    base.recommended_products = [];
+  }
+  return base;
+});
 
 return res.status(200).json({
   data: {

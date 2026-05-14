@@ -45,9 +45,7 @@ uploadsRouter.post("/product-image", upload.single("image"), (req, res) => {
     return res.status(400).json({ message: "image file is required." });
   }
 
-  const imageUrl = `${req.protocol}://${req.get("host")}/uploads/products/${
-    req.file.filename
-  }`;
+  const imageUrl = `/uploads/products/${req.file.filename}`;
 
   return res.status(201).json({
     data: {
@@ -61,9 +59,7 @@ uploadsRouter.post("/store-logo", upload.single("image"), (req, res) => {
     return res.status(400).json({ message: "image file is required." });
   }
 
-  const imageUrl = `${req.protocol}://${req.get("host")}/uploads/products/${
-    req.file.filename
-  }`;
+  const imageUrl = `/uploads/products/${req.file.filename}`;
 
   return res.status(201).json({
     data: {

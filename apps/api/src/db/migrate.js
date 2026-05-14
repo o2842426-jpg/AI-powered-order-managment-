@@ -12,6 +12,7 @@ function migrate(db) {
   ensureStoreSubscriptionColumns(db);
   ensureProductImageColumns(db);
   ensureProductVariantActiveColumns(db);
+  ensureChatMessagePayloadColumn(db);
 }
 
 function ensureStoreSettingsColumns(db) {
@@ -78,6 +79,14 @@ function ensureProductVariantActiveColumns(db) {
     db.exec(
       "ALTER TABLE product_variants ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1"
     );
+  }
+}
+
+function ensureChatMessagePayloadColumn(db) {
+  const columns = db.prepare("PRAGMA table_info(chat_messages)").all();
+  const columnNames = new Set(columns.map((column) => column.name));
+  if (!columnNames.has("payload")) {
+    db.exec("ALTER TABLE chat_messages ADD COLUMN payload TEXT");
   }
 }
 

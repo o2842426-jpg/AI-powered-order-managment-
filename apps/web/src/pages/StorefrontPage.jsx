@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiUrl } from "../lib/api";
+import { apiUrl, mediaUrl } from "../lib/api";
 import { getEffectivePublicStoreSlug } from "../lib/publicStoreSlug";
 import { formatProductOptionSummary } from "../lib/productOptions";
 import "./StorefrontPage.css";
@@ -362,7 +362,8 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
 
   function productThumbUrl(productId) {
     const p = products.find((x) => x.id === productId);
-    return p?.image_url ?? null;
+    const raw = p?.image_url ?? null;
+    return raw ? mediaUrl(raw) : null;
   }
 
   const filteredProducts = products.filter((product, index) => {
@@ -633,12 +634,23 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
     }
   }
 
-  function getMentionedProducts(messageText) {
-    const text = String(messageText || "").toLowerCase();
-
-    return products
-      .filter((product) => text.includes(String(product.name).toLowerCase()))
-      .slice(0, 2);
+  function getRecommendedProductsFromMessage(msg) {
+    if (!msg || msg.sender_type !== "ai") return [];
+    if (Array.isArray(msg.recommended_products) && msg.recommended_products.length > 0) {
+      return msg.recommended_products;
+    }
+    if (typeof msg.payload === "string" && msg.payload.trim()) {
+      try {
+        const p = JSON.parse(msg.payload);
+        const ids = Array.isArray(p.recommended_product_ids) ? p.recommended_product_ids : [];
+        return ids
+          .map((id) => products.find((pr) => Number(pr.id) === Number(id)))
+          .filter(Boolean);
+      } catch {
+        return [];
+      }
+    }
+    return [];
   }
 
   const closeProductSheet = useCallback(() => {
@@ -741,9 +753,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
         )}
         {chatMessages.map((msg) => {
           const mentionedProducts =
-            msg.sender_type === "ai"
-              ? getMentionedProducts(msg.message_text)
-              : [];
+            msg.sender_type === "ai" ? getRecommendedProductsFromMessage(msg) : [];
           const isCustomer = msg.sender_type === "customer";
 
           return (
@@ -969,7 +979,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                       {product.image_url ? (
                         <img
                           className="storefront__pdp-hero-img"
-                          src={product.image_url}
+                          src={mediaUrl(product.image_url)}
                           alt=""
                         />
                       ) : (
@@ -1156,7 +1166,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
             {store?.logo_url ? (
               <img
                 className="storefront__topnav-logo"
-                src={store.logo_url}
+                src={mediaUrl(store.logo_url)}
                 alt=""
               />
             ) : (
@@ -1385,7 +1395,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                               {featuredProduct.image_url ? (
                                 <img
                                   className="storefront__product-image"
-                                  src={featuredProduct.image_url}
+                                  src={mediaUrl(featuredProduct.image_url)}
                                   alt={featuredProduct.name}
                                 />
                               ) : (
@@ -1476,7 +1486,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
                                 {productHasStock(p) ? "متوفر" : "غير متوفر"}
                               </span>
                               {p.image_url ? (
-                                <img className="storefront__product-image" src={p.image_url} alt={p.name} />
+                                <img className="storefront__product-image" src={mediaUrl(p.image_url)} alt={p.name} />
                               ) : (
                                 <div className="storefront__product-image-placeholder">بدون صورة</div>
                               )}

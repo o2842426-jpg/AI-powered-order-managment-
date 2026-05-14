@@ -21,6 +21,11 @@
 - `GET /api/admin/stores?limit=&offset=` — قائمة المتاجر مع `owner_email` وحقول الفوترة/التجربة.
 - `PATCH /api/admin/stores/:storeId` — جسم JSON اختياري: `subscription_status` (`active` \| `trial` \| `suspended` \| `trialing` \| `past_due` \| `unpaid`)، `trial_ends_at` (ISO)، `extend_trial_days` (1–365)، `clear_stripe` (`true` لمسح معرفات Stripe على المتجر).
 
+## Public chat (storefront)
+
+- `POST /api/public/:storeSlug/chat/messages` — body `{ session_id, message_text }`. يُخزّن رد الـ AI كنص عربي في `message_text`، وفي عمود `payload` (JSON): `{ "recommended_product_ids": number[] }` عند اقتراح منتجات. الاستجابة `data.messages` تتضمن آخر رسالتين؛ لرسائل `sender_type === "ai"` قد تُملأ أيضًا `recommended_product_ids` و `recommended_products` (مصفوفة منتجات مع `variants` مُجمّعة من الخادم).
+- `GET /api/public/:storeSlug/chat/sessions/:sessionId/messages` — يعيد `messages` مع نفس الحقول الاختيارية للعرض.
+
 ## Planned Public Endpoints
 
 - `GET /api/public/:storeSlug/products`

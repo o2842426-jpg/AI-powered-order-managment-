@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   sender_type TEXT NOT NULL, -- customer | ai | owner
   message_text TEXT NOT NULL,
   intent TEXT,
+  payload TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
 );

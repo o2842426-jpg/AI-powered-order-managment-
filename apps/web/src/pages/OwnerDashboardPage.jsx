@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { mediaUrl } from "../lib/api";
 import { authFetch, getOwnerStoreIdFromAuth } from "../lib/auth";
 import { buildPublicStorefrontUrl } from "../lib/storefrontUrl";
 import { formatProductOptionSummary } from "../lib/productOptions";
@@ -1309,7 +1310,7 @@ export function OwnerDashboardPage({
                 >
                   <div className="owner-dashboard__low-stock-product">
                     {item.product_image_url ? (
-                      <img src={item.product_image_url} alt={item.product_name} />
+                      <img src={mediaUrl(item.product_image_url)} alt={item.product_name} />
                     ) : (
                       <span>{item.product_name?.slice(0, 1) || "م"}</span>
                     )}
@@ -1386,7 +1387,7 @@ export function OwnerDashboardPage({
               </label>
               {settings.logo_url && (
                 <div className="owner-dashboard__brand-preview">
-                  <img src={settings.logo_url} alt="لوجو المتجر" />
+                  <img src={mediaUrl(settings.logo_url)} alt="لوجو المتجر" />
                   <span>معاينة اللوجو</span>
                 </div>
               )}
@@ -1564,7 +1565,7 @@ export function OwnerDashboardPage({
           {productDraft.image_url && (
             <img
               className="owner-dashboard__image-preview"
-              src={productDraft.image_url}
+              src={mediaUrl(productDraft.image_url)}
               alt="معاينة المنتج"
             />
           )}
@@ -1619,7 +1620,7 @@ export function OwnerDashboardPage({
                 }
               >
                 {product.image_url ? (
-                  <img src={product.image_url} alt={product.name} />
+                  <img src={mediaUrl(product.image_url)} alt={product.name} />
                 ) : (
                   <div className="owner-dashboard__product-placeholder">
                     بلا صورة
@@ -1734,7 +1735,7 @@ export function OwnerDashboardPage({
             {productEdit.image_url && (
               <img
                 className="owner-dashboard__image-preview"
-                src={productEdit.image_url}
+                src={mediaUrl(productEdit.image_url)}
                 alt="معاينة المنتج"
               />
             )}
