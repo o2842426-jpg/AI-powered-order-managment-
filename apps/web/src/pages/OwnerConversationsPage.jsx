@@ -29,6 +29,7 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
   const [followupTasksLoading, setFollowupTasksLoading] = useState(false);
   const [followupTasksError, setFollowupTasksError] = useState("");
   const [followupActionId, setFollowupActionId] = useState(null);
+  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
