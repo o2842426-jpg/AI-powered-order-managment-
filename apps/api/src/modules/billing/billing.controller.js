@@ -8,6 +8,16 @@ const {
   hasOwnerToolAccess,
   ownerAccessReason,
 } = require("./billing.access");
+const {
+  stripePriceIdForCheckoutPlan,
+  effectivePlanTierForStore,
+  getAiMessageMonthlyLimit,
+  getCapabilitiesForTier,
+} = require("../plans/planMatrix");
+const {
+  ensureAiUsageMonth,
+  incrementAiMessageUsage,
+} = require("../plans/aiUsage");
 
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -28,7 +38,11 @@ function getBillingStatus(req, res) {
             subscription_current_period_end,
             stripe_customer_id,
             trial_started_at,
-            trial_ends_at
+            trial_ends_at,
+            plan_tier,
+            stripe_price_id,
+            ai_messages_used,
+            ai_messages_period_ym
           FROM stores
           WHERE id = ?
         `
@@ -37,6 +51,21 @@ function getBillingStatus(req, res) {
 
     const status = row?.subscription_status ?? "active";
     const hasAccess = !enforced || hasOwnerToolAccess(row || {});
+
+    ensureAiUsageMonth(req.user.store_id);
+    const usageRow = db
+      .prepare(
+        `
+          SELECT ai_messages_used
+          FROM stores
+          WHERE id = ?
+        `
+      )
+      .get(req.user.store_id);
+
+    const effectiveTier = effectivePlanTierForStore(row || {});
+    const aiLimit = getAiMessageMonthlyLimit(effectiveTier);
+    const used = Number(usageRow?.ai_messages_used || 0);
 
     return res.status(200).json({
       data: {
@@ -48,11 +77,78 @@ function getBillingStatus(req, res) {
         trial_started_at: row?.trial_started_at ?? null,
         trial_ends_at: row?.trial_ends_at ?? null,
         can_use_portal: Boolean(row?.stripe_customer_id),
+        plan_tier: effectiveTier,
+        stripe_price_id: row?.stripe_price_id ?? null,
+        ai_messages_used: used,
+        ai_messages_monthly_limit: aiLimit,
+        capabilities: getCapabilitiesForTier(effectiveTier),
       },
     });
   } catch (error) {
     return res.status(500).json({
       message: "Could not load billing status.",
+      error: error.message,
+    });
+  }
+}
+
+function getEntitlements(req, res) {
+  try {
+    const row = db
+      .prepare(
+        `
+          SELECT
+            id,
+            subscription_status,
+            plan_tier,
+            trial_ends_at,
+            stripe_price_id,
+            ai_messages_used,
+            ai_messages_period_ym
+          FROM stores
+          WHERE id = ?
+        `
+      )
+      .get(req.user.store_id);
+
+    if (!row) {
+      return res.status(404).json({ message: "Store not found." });
+    }
+
+    ensureAiUsageMonth(row.id);
+    const fresh = db
+      .prepare(
+        `
+          SELECT
+            subscription_status,
+            plan_tier,
+            trial_ends_at,
+            ai_messages_used,
+            ai_messages_period_ym
+          FROM stores
+          WHERE id = ?
+        `
+      )
+      .get(req.user.store_id);
+
+    const tier = effectivePlanTierForStore(fresh);
+    const limit = getAiMessageMonthlyLimit(tier);
+    const used = Number(fresh?.ai_messages_used || 0);
+
+    return res.status(200).json({
+      data: {
+        plan_tier: tier,
+        capabilities: getCapabilitiesForTier(tier),
+        ai_messages: {
+          used,
+          monthly_limit: limit,
+          period_ym: fresh?.ai_messages_period_ym ?? null,
+        },
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Could not load entitlements.",
       error: error.message,
     });
   }
@@ -67,10 +163,14 @@ async function createCheckoutSession(req, res) {
     }
 
     const stripe = getStripe();
-    const priceId = process.env.STRIPE_PRICE_ID;
+    const plan = String(req.body?.plan || "starter").trim().toLowerCase();
+    const priceId = stripePriceIdForCheckoutPlan(plan);
 
     if (!stripe || !priceId) {
-      return res.status(500).json({ message: "Stripe is not configured." });
+      return res.status(400).json({
+        message:
+          "Stripe price is not configured for this plan. Set STRIPE_PRICE_STARTER / GROWTH / PRO (or STRIPE_PRICE_ID for starter).",
+      });
     }
 
     const user = db
@@ -163,6 +263,7 @@ async function createPortalSession(req, res) {
 
 module.exports = {
   getBillingStatus,
+  getEntitlements,
   createCheckoutSession,
   createPortalSession,
 };

@@ -99,6 +99,29 @@ function buildOwnerPrompt(store) {
   return prompt;
 }
 
+
+/** @param {{ fact_text?: string }[]} facts */
+function buildMemoryFactsBlock(facts) {
+  if (!Array.isArray(facts) || facts.length === 0) return "";
+  const lines = facts
+    .map((f) => String(f?.fact_text ?? "").trim())
+    .filter(Boolean);
+  if (!lines.length) return "";
+  const numbered = lines.map((t, i) => `${i + 1}. ${t}`).join("\n");
+  return `\n\nحقائق تشغيلية من المالك (استخدمها لاتساق الردود مع العملاء؛ لا تخالف كتالوج المنتجات ولا تخترع أسعارًا أو توفرًا):\n${numbered}`;
+}
+
+/** @param {{ followup_text?: string }[]} rows */
+function buildFollowupsBlock(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return "";
+  const lines = rows
+    .map((r) => String(r?.followup_text ?? "").trim())
+    .filter(Boolean);
+  if (!lines.length) return "";
+  const numbered = lines.map((t, i) => `${i + 1}. ${t}`).join("\n");
+  return `\n\nعبارات متابعة من المالك (استخدمها بحذر وطبيعية — فقط عندما يناسب سياق المحادثة؛ لا تكررها في كل رد ولا تدمج أكثر من فكرة خفيفة واحدة عندما يكون ذلك ملائمًا؛ لا تخالف الكتالوج):\n${numbered}`;
+}
+
 /**
  * @param {string} raw
  * @param {Set<number>} allowedProductIds
@@ -173,6 +196,8 @@ async function generateStoreChatReply({
   products,
   messageText,
   conversationMessages,
+  memoryFacts,
+  followups = [],
 }) {
   const allowedProductIds = new Set(
     (products || []).map((p) => Number(p.id)).filter((n) => Number.isInteger(n) && n > 0)
@@ -185,6 +210,8 @@ async function generateStoreChatReply({
 
   const catalogText = buildCatalogText(products, store?.currency_code);
   const ownerPrompt = buildOwnerPrompt(store);
+  const memoryBlock = buildMemoryFactsBlock(memoryFacts);
+  const followupsBlock = buildFollowupsBlock(followups);
   const historyMessages = buildConversationMessages(
     conversationMessages,
     messageText
@@ -232,7 +259,7 @@ ${jsonInstructions}
 - لا تؤكد طلبًا نهائيًا؛ ذكّر أن الاختيار من الواجهة أو السلة.
 
 تعليمات صاحب المتجر (ما لم تخالف الكتالوج):
-${ownerPrompt}`,
+${ownerPrompt}${memoryBlock}${followupsBlock}`,
         },
         {
           role: "system",

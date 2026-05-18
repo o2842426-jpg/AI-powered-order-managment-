@@ -5,6 +5,7 @@ import { getAdminApiKey } from "./adminApi";
 export const OWNER_APP_VIEWS = new Set([
   "dashboard",
   "orders",
+  "conversations",
   "products",
   "inventory",
   "customers",

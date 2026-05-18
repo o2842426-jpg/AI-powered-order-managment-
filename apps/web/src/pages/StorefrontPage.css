@@ -1725,6 +1725,23 @@
   border-radius: 18px;
 }
 
+.storefront__assistant-panel .storefront__chat-message.is-owner {
+  background: rgba(234, 179, 8, 0.1);
+  border-radius: 18px;
+  border: 1px solid rgba(234, 179, 8, 0.28);
+}
+
+.storefront__chat-takeover-notice {
+  margin: 0 0 var(--sf-space-2);
+  padding: var(--sf-space-2) var(--sf-space-3);
+  border-radius: var(--sf-space-2);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--sf-text);
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.25);
+}
+
 .storefront__chat-messages {
   display: grid;
   gap: var(--sf-space-2);

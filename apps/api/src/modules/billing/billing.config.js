@@ -1,10 +1,10 @@
+const { hasConfiguredStripePrices } = require("../plans/planMatrix");
+
 function isBillingEnforced() {
-  return Boolean(
-    process.env.STRIPE_SECRET_KEY &&
-      String(process.env.STRIPE_SECRET_KEY).trim() &&
-      process.env.STRIPE_PRICE_ID &&
-      String(process.env.STRIPE_PRICE_ID).trim()
-  );
+  const secret =
+    process.env.STRIPE_SECRET_KEY && String(process.env.STRIPE_SECRET_KEY).trim();
+  if (!secret) return false;
+  return hasConfiguredStripePrices();
 }
 
 function getFrontendBaseUrl() {

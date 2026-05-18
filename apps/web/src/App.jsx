@@ -15,7 +15,7 @@ import { OwnerLoginPage } from "./pages/OwnerLoginPage";
 import { OwnerOrdersPage } from "./pages/OwnerOrdersPage";
 import { CreateStorePage } from "./pages/CreateStorePage";
 import { StorefrontPage } from "./pages/StorefrontPage";
-import { OwnerUpgradePage } from "./pages/OwnerUpgradePage";
+import { OwnerConversationsPage } from "./pages/OwnerConversationsPage";
 import { SuperAdminLoginPage } from "./pages/SuperAdminLoginPage";
 import { SuperAdminPage } from "./pages/SuperAdminPage";
 
@@ -183,11 +183,11 @@ function App() {
     setBillingStatus(null);
   }
 
-  async function startCheckout() {
+  async function startCheckout(plan = "starter") {
     const res = await authFetch("/api/billing/checkout-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: "{}",
+      body: JSON.stringify({ plan }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -285,6 +285,16 @@ function App() {
       );
     }
 
+    if (view === "conversations") {
+      return (
+        <OwnerConversationsPage
+          key={`conv-${ownerAuth.user?.store_id ?? ownerAuth.user?.id ?? "u"}`}
+          billingStatus={billingStatus}
+          onGoUpgrade={() => setView("upgrade")}
+        />
+      );
+    }
+
     if (
       view === "dashboard" ||
       view === "products" ||
@@ -301,6 +311,7 @@ function App() {
             const map = {
               dashboard: "dashboard",
               orders: "orders",
+              conversations: "conversations",
               products: "products",
               inventory: "inventory",
               customers: "customers",

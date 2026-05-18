@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiUrl, mediaUrl } from "../lib/api";
 import { formatStoreMoney, normalizeStoreCurrencyCode } from "../lib/storeCurrency";
 import { getEffectivePublicStoreSlug } from "../lib/publicStoreSlug";
+import {
+  clearPublicChatSessionId,
+  readPublicChatSessionId,
+  writePublicChatSessionId,
+} from "../lib/publicChatSessionStorage";
 import { formatProductOptionSummary } from "../lib/productOptions";
 import "./StorefrontPage.css";
 
@@ -90,7 +95,31 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
   const [chatText, setChatText] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState("");
+  /** أثناء تفعيل «تولّي المالك» لا يُرسل ردّ آلي — نُظهر تنبيهًا للعميل. */
+  const [chatHumanTakeover, setChatHumanTakeover] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState([]);
+
+  const tryRestorePublicChat = useCallback(async (slug, isStale) => {
+    const stored = readPublicChatSessionId(slug);
+    if (!stored) return null;
+    const res = await fetch(
+      apiUrl(
+        `/api/public/${encodeURIComponent(slug)}/chat/sessions/${encodeURIComponent(stored)}/messages`
+      )
+    );
+    const body = await res.json().catch(() => ({}));
+    if (isStale?.()) return null;
+    if (!res.ok) {
+      if (res.status === 404) {
+        clearPublicChatSessionId(slug);
+      }
+      return null;
+    }
+    setChatSessionId(stored);
+    setChatMessages(Array.isArray(body.data?.messages) ? body.data.messages : []);
+    setChatHumanTakeover(Number(body.data?.session?.owner_takeover) === 1);
+    return stored;
+  }, []);
 
   function toggleFavorite(productId) {
     setFavoriteIds((prev) =>
@@ -153,7 +182,20 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
     setChatSessionId(null);
     setChatMessages([]);
     setChatError("");
-  }, [publicSlugVersion]);
+    setChatHumanTakeover(false);
+
+    const slug = getEffectivePublicStoreSlug();
+    if (!slug) return;
+
+    let stale = false;
+    void (async () => {
+      await tryRestorePublicChat(slug, () => stale);
+    })();
+
+    return () => {
+      stale = true;
+    };
+  }, [publicSlugVersion, tryRestorePublicChat]);
 
   /** مساحة إضافية أسفل منطقة التمرير فوق الشريط الثابت وزر التبديل (جوال). */
   useEffect(() => {
@@ -488,6 +530,9 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
       return null;
     }
 
+    const restored = await tryRestorePublicChat(slug, () => false);
+    if (restored) return restored;
+
     const res = await fetch(
       apiUrl(`/api/public/${encodeURIComponent(slug)}/chat/sessions`),
       { method: "POST" }
@@ -499,6 +544,9 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
     }
 
     const newSessionId = body.data?.id;
+    if (newSessionId != null) {
+      writePublicChatSessionId(slug, newSessionId);
+    }
     setChatSessionId(newSessionId);
     return newSessionId;
   }
@@ -533,7 +581,12 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
         throw new Error(body.message || `فشل إرسال الرسالة (${res.status})`);
       }
 
-      setChatMessages((prev) => [...prev, ...(body.data?.messages || [])]);
+      setChatHumanTakeover(Boolean(body.data?.owner_takeover_active));
+      setChatMessages((prev) => {
+        const seen = new Set(prev.map((m) => m.id));
+        const incoming = (body.data?.messages || []).filter((m) => m != null && !seen.has(m.id));
+        return [...prev, ...incoming];
+      });
       setChatText("");
     } catch (e) {
       setChatError(e.message || "تعذر إرسال الرسالة.");
@@ -732,6 +785,12 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
         </div>
       </header>
 
+      {chatHumanTakeover ? (
+        <p className="storefront__chat-takeover-notice" role="status">
+          فريق المتجر يردّ عليك مباشرة الآن — قد يتأخر الردّ قليلًا دون مساعد آلي.
+        </p>
+      ) : null}
+
       <div
         className="storefront__quick-questions storefront__quick-questions--chips"
         aria-label="أسئلة سريعة"
@@ -759,13 +818,20 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
           const mentionedProducts =
             msg.sender_type === "ai" ? getRecommendedProductsFromMessage(msg) : [];
           const isCustomer = msg.sender_type === "customer";
+          const isOwner = msg.sender_type === "owner";
+          const bubbleClass = isCustomer
+            ? "is-customer"
+            : isOwner
+              ? "is-owner"
+              : "is-ai";
+          const senderLabel = isCustomer ? "أنت" : isOwner ? "فريق المتجر" : "مساعد المتجر";
 
           return (
             <div
               key={msg.id}
-              className={`storefront__chat-message ${isCustomer ? "is-customer" : "is-ai"}`}
+              className={`storefront__chat-message ${bubbleClass}`}
             >
-              <strong>{isCustomer ? "أنت" : "مساعد المتجر"}</strong>
+              <strong>{senderLabel}</strong>
               <p>{msg.message_text}</p>
               {mentionedProducts.length > 0 && (
                 <div className="storefront__chat-products">
@@ -823,7 +889,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
             </div>
           );
         })}
-        {chatLoading && (
+        {chatLoading && !chatHumanTakeover && (
           <div className="storefront__chat-message is-ai storefront__typing">
             <strong>مساعد المتجر</strong>
             <p>

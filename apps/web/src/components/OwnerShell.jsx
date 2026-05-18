@@ -1,8 +1,14 @@
+import { useMemo } from "react";
 import "./OwnerShell.css";
 
-const NAV = [
+const NAV_ITEMS = [
   { id: "dashboard", label: "لوحة التحكم" },
   { id: "orders", label: "الطلبات" },
+  {
+    id: "conversations",
+    label: "المحادثات",
+    requiresFeature: "conversations_dashboard",
+  },
   { id: "products", label: "المنتجات" },
   { id: "inventory", label: "المخزون" },
   { id: "customers", label: "العملاء" },
@@ -67,9 +73,25 @@ function IconGear() {
   );
 }
 
+function IconChat() {
+  return (
+    <svg className="owner-shell__nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 5h16v12H7l-3 3V5z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <path d="M8 9h8M8 12h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 const ICONS = {
   dashboard: IconDashboard,
   orders: IconOrders,
+  conversations: IconChat,
   products: IconBox,
   inventory: IconLayers,
   customers: IconUsers,
@@ -100,6 +122,15 @@ export function OwnerShell({
   const subscriptionTone =
     billingStatus?.billing_enforced && !billingStatus?.has_access ? "is-warn" : "is-ok";
 
+  const visibleNav = useMemo(() => {
+    return NAV_ITEMS.filter((item) => {
+      if (item.requiresFeature !== "conversations_dashboard") return true;
+      if (!billingStatus?.billing_enforced) return true;
+      const caps = billingStatus.capabilities;
+      return Array.isArray(caps) && caps.includes("conversations_dashboard");
+    });
+  }, [billingStatus]);
+
   return (
     <div className="owner-shell">
       <aside className="owner-shell__sidebar" aria-label="قائمة لوحة المالك">
@@ -112,7 +143,7 @@ export function OwnerShell({
         </div>
 
         <nav className="owner-shell__nav">
-          {NAV.map((item) => {
+          {visibleNav.map((item) => {
             const Icon = ICONS[item.id] || IconDashboard;
             const isActive = activeView === item.id;
             return (

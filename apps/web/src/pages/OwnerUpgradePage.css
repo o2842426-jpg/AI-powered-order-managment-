@@ -16,6 +16,103 @@
   border: 1px solid var(--dm-color-border, #e8e8ef);
   box-shadow: var(--dm-shadow-card, 0 12px 40px rgba(21, 21, 21, 0.07));
   margin-bottom: var(--dm-space-5);
+  overflow: hidden;
+}
+
+.owner-upgrade__hero-inner {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .owner-upgrade__hero-inner > * {
+    animation: owner-upgrade-fade-up 0.62s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .owner-upgrade__hero-inner > *:nth-child(1) {
+    animation-delay: 0.04s;
+  }
+  .owner-upgrade__hero-inner > *:nth-child(2) {
+    animation-delay: 0.1s;
+  }
+  .owner-upgrade__hero-inner > *:nth-child(3) {
+    animation-delay: 0.16s;
+  }
+  .owner-upgrade__hero-inner > *:nth-child(4) {
+    animation-delay: 0.22s;
+  }
+  .owner-upgrade__hero-inner > *:nth-child(5) {
+    animation-delay: 0.28s;
+  }
+  .owner-upgrade__hero-inner > *:nth-child(6) {
+    animation-delay: 0.34s;
+  }
+  .owner-upgrade__hero-inner > *:nth-child(7) {
+    animation-delay: 0.4s;
+  }
+
+  .owner-upgrade__plan-card:nth-child(1) {
+    animation-delay: 0.42s;
+  }
+  .owner-upgrade__plan-card:nth-child(2) {
+    animation-delay: 0.5s;
+  }
+  .owner-upgrade__plan-card:nth-child(3) {
+    animation-delay: 0.58s;
+  }
+
+  .owner-upgrade__plan-card {
+    animation: owner-upgrade-fade-up 0.52s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .owner-upgrade__hero::before {
+    content: "";
+    position: absolute;
+    inset: -40% -20%;
+    background: radial-gradient(
+      closest-side,
+      rgba(109, 94, 249, 0.08),
+      transparent 70%
+    );
+    animation: owner-upgrade-aurora 14s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+
+  .owner-upgrade__btn--pulse:not(:disabled):hover {
+    animation: owner-upgrade-cta-glow 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes owner-upgrade-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes owner-upgrade-aurora {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(-4%, 3%) scale(1.05);
+  }
+}
+
+@keyframes owner-upgrade-cta-glow {
+  0%,
+  100% {
+    box-shadow: 0 10px 28px rgba(109, 94, 249, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 12px 36px rgba(109, 94, 249, 0.48),
+      0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+  }
 }
 
 .owner-upgrade__eyebrow {
@@ -160,6 +257,27 @@
   margin-bottom: var(--dm-space-5);
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .owner-upgrade__compare .owner-upgrade__section-title,
+  .owner-upgrade__pricing,
+  .owner-upgrade__trust,
+  .owner-upgrade__footer-cta {
+    animation: owner-upgrade-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: 0.12s;
+  }
+
+  .owner-upgrade__card {
+    animation: owner-upgrade-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .owner-upgrade__card:nth-child(1) {
+    animation-delay: 0.08s;
+  }
+  .owner-upgrade__card:nth-child(2) {
+    animation-delay: 0.18s;
+  }
+}
+
 .owner-upgrade__cards {
   display: grid;
   grid-template-columns: 1fr;
@@ -259,4 +377,76 @@
 
 .owner-upgrade__footer-cta .owner-upgrade__btn {
   margin-inline: auto;
+}
+
+.owner-upgrade__plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--dm-space-2);
+  margin-bottom: var(--dm-space-4);
+}
+
+.owner-upgrade__plan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: var(--dm-space-3) var(--dm-space-3);
+  border-radius: 16px;
+  border: 2px solid var(--dm-color-border, #e8e8ef);
+  background: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+  color: inherit;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+
+.owner-upgrade__plan-card:hover {
+  border-color: rgba(109, 94, 249, 0.35);
+  box-shadow: 0 8px 28px rgba(109, 94, 249, 0.12);
+  transform: translateY(-1px);
+}
+
+.owner-upgrade__plan-card.is-selected {
+  border-color: rgba(109, 94, 249, 0.65);
+  box-shadow: 0 0 0 3px rgba(109, 94, 249, 0.12);
+}
+
+.owner-upgrade__plan-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6d5ef9;
+  background: rgba(109, 94, 249, 0.12);
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+.owner-upgrade__plan-name {
+  font-weight: 900;
+  font-size: 1.05rem;
+}
+
+.owner-upgrade__plan-price {
+  font-weight: 900;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+}
+
+.owner-upgrade__plan-period {
+  font-size: 0.78rem;
+  color: var(--dm-color-text-muted, #5b5f6a);
+}
+
+.owner-upgrade__plan-blurb {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--dm-color-text-muted, #5b5f6a);
+  margin-top: 4px;
 }

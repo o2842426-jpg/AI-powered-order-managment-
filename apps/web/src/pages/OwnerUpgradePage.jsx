@@ -17,6 +17,7 @@ function formatTrialEnd(iso) {
 
 export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStore }) {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutPlan, setCheckoutPlan] = useState("growth");
   const reason = billingStatus?.access_reason ?? "";
   const trialEndsLabel = useMemo(
     () => formatTrialEnd(billingStatus?.trial_ends_at),
@@ -42,40 +43,89 @@ export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStor
   async function handleCheckout() {
     setCheckoutLoading(true);
     try {
-      await onStartCheckout?.();
+      await onStartCheckout?.(checkoutPlan);
     } finally {
       setCheckoutLoading(false);
     }
   }
 
+  const planCards = [
+    {
+      id: "starter",
+      title: "Starter",
+      price: "$19",
+      blurb: "ردود AI، توصيات، حتى 1000 رسالة شهريًا",
+    },
+    {
+      id: "growth",
+      title: "Growth",
+      price: "$49",
+      badge: "الأكثر شيوعًا",
+      blurb: "لوحة محادثات، تحليلات أعمق، حتى 10k رسالة",
+    },
+    {
+      id: "pro",
+      title: "Pro",
+      price: "$99",
+      blurb: "مبيعات AI متقدمة — رسائل غير محدودة عمليًا",
+    },
+  ];
+
   return (
     <div className="owner-upgrade" dir="rtl">
       <section className="owner-upgrade__hero" aria-labelledby="owner-upgrade-title">
-        <p className="owner-upgrade__eyebrow">ترقية الخطة</p>
-        <h1 id="owner-upgrade-title" className="owner-upgrade__title">
-          رقِّ موظف المبيعات الرقمي لديك
-        </h1>
-        <p className="owner-upgrade__lead">
-          كل رد متأخر هو عميل محتمل ضاع. حوّل رسائل إنستغرام وتيك توك إلى{" "}
-          <strong>موظف مبيعات بالذكاء الاصطناعي يعمل 24/7</strong> داخل متجرك.
-        </p>
-        <blockquote className="owner-upgrade__quote">
-          موظف واحد قد يكلفك مئات الدولارات شهريًا. مساعد المبيعات الذكي يبدأ من سعر رمزي —
-          بنفس الاحتراف، وبلا تعب التوظيف والورديات.
-        </blockquote>
-        <p className="owner-upgrade__sub">{subline}</p>
-        <div className="owner-upgrade__cta-row">
-          <button
-            type="button"
-            className="owner-upgrade__btn owner-upgrade__btn--primary"
-            disabled={checkoutLoading}
-            onClick={handleCheckout}
-          >
-            {checkoutLoading ? "جاري التحويل…" : "فعّل الاشتراك الآن"}
-          </button>
-          <button type="button" className="owner-upgrade__btn owner-upgrade__btn--ghost" onClick={onPreviewStore}>
-            معاينة المتجر كزائر
-          </button>
+        <div className="owner-upgrade__hero-inner">
+          <p className="owner-upgrade__eyebrow">ترقية الخطة</p>
+          <h1 id="owner-upgrade-title" className="owner-upgrade__title">
+            رقِّ موظف المبيعات الرقمي لديك
+          </h1>
+          <p className="owner-upgrade__lead">
+            كل رد متأخر هو عميل محتمل ضاع. حوّل رسائل إنستغرام وتيك توك إلى{" "}
+            <strong>موظف مبيعات بالذكاء الاصطناعي يعمل 24/7</strong> داخل متجرك.
+          </p>
+          <blockquote className="owner-upgrade__quote">
+            موظف واحد قد يكلفك مئات الدولارات شهريًا. مساعد المبيعات الذكي يبدأ من سعر رمزي —
+            بنفس الاحتراف، وبلا تعب التوظيف والورديات.
+          </blockquote>
+          <p className="owner-upgrade__sub">{subline}</p>
+          <div className="owner-upgrade__plans" role="group" aria-label="اختر الخطة">
+            {planCards.map((card) => {
+              const selected = checkoutPlan === card.id;
+              return (
+                <button
+                  key={card.id}
+                  type="button"
+                  className={
+                    selected
+                      ? "owner-upgrade__plan-card is-selected"
+                      : "owner-upgrade__plan-card"
+                  }
+                  onClick={() => setCheckoutPlan(card.id)}
+                >
+                  {card.badge ? (
+                    <span className="owner-upgrade__plan-badge">{card.badge}</span>
+                  ) : null}
+                  <span className="owner-upgrade__plan-name">{card.title}</span>
+                  <span className="owner-upgrade__plan-price">{card.price}</span>
+                  <span className="owner-upgrade__plan-period">/ شهر</span>
+                  <span className="owner-upgrade__plan-blurb">{card.blurb}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="owner-upgrade__cta-row">
+            <button
+              type="button"
+              className="owner-upgrade__btn owner-upgrade__btn--primary owner-upgrade__btn--pulse"
+              disabled={checkoutLoading}
+              onClick={handleCheckout}
+            >
+              {checkoutLoading ? "جاري التحويل…" : "فعّل الاشتراك الآن"}
+            </button>
+            <button type="button" className="owner-upgrade__btn owner-upgrade__btn--ghost" onClick={onPreviewStore}>
+              معاينة المتجر كزائر
+            </button>
+          </div>
         </div>
       </section>
 
@@ -139,7 +189,7 @@ export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStor
         <p>جاهز لتقليل الفرص الضائعة؟</p>
         <button
           type="button"
-          className="owner-upgrade__btn owner-upgrade__btn--primary owner-upgrade__btn--wide"
+          className="owner-upgrade__btn owner-upgrade__btn--primary owner-upgrade__btn--wide owner-upgrade__btn--pulse"
           disabled={checkoutLoading}
           onClick={handleCheckout}
         >

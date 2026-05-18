@@ -1,5 +1,6 @@
 const Stripe = require("stripe");
 const { db } = require("../../db/client");
+const { planTierFromStripePriceId } = require("../plans/planMatrix");
 
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -25,12 +26,17 @@ function updateStoreSubscriptionFields({
   subscriptionId,
   stripeStatus,
   currentPeriodEndUnix,
+  stripePriceId,
+  planTier,
 }) {
   const mapped = mapStripeStatus(stripeStatus);
   const endIso =
     currentPeriodEndUnix != null
       ? new Date(Number(currentPeriodEndUnix) * 1000).toISOString()
       : null;
+
+  const priceId = stripePriceId ? String(stripePriceId).trim() : null;
+  const tier = planTier || planTierFromStripePriceId(priceId);
 
   db.prepare(
     `
@@ -39,10 +45,12 @@ function updateStoreSubscriptionFields({
         stripe_customer_id = COALESCE(?, stripe_customer_id),
         stripe_subscription_id = ?,
         subscription_status = ?,
-        subscription_current_period_end = ?
+        subscription_current_period_end = ?,
+        stripe_price_id = ?,
+        plan_tier = ?
       WHERE id = ?
     `
-  ).run(customerId, subscriptionId, mapped, endIso, storeId);
+  ).run(customerId, subscriptionId, mapped, endIso, priceId, tier, storeId);
 }
 
 async function handleCheckoutSessionCompleted(session) {
@@ -56,7 +64,12 @@ async function handleCheckoutSessionCompleted(session) {
   const customerId = session.customer;
   if (!subscriptionId || !customerId) return;
 
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+    expand: ["items.data.price"],
+  });
+
+  const item0 = subscription.items?.data?.[0];
+  const priceId = item0?.price?.id ?? null;
 
   updateStoreSubscriptionFields({
     storeId,
@@ -64,10 +77,19 @@ async function handleCheckoutSessionCompleted(session) {
     subscriptionId: subscription.id,
     stripeStatus: subscription.status,
     currentPeriodEndUnix: subscription.current_period_end,
+    stripePriceId: priceId,
+    planTier: planTierFromStripePriceId(priceId),
   });
 }
 
 async function handleSubscriptionUpdated(subscription) {
+  const stripe = getStripe();
+  if (!stripe) return;
+
+  const full = await stripe.subscriptions.retrieve(subscription.id, {
+    expand: ["items.data.price"],
+  });
+
   const storeRow = db
     .prepare(
       `
@@ -76,22 +98,27 @@ async function handleSubscriptionUpdated(subscription) {
         WHERE stripe_subscription_id = ?
       `
     )
-    .get(subscription.id);
+    .get(full.id);
 
   let storeId = storeRow?.id;
 
-  if (!storeId && subscription.metadata?.store_id) {
-    storeId = Number(subscription.metadata.store_id);
+  if (!storeId && full.metadata?.store_id) {
+    storeId = Number(full.metadata.store_id);
   }
 
   if (!storeId) return;
 
+  const item0 = full.items?.data?.[0];
+  const priceId = item0?.price?.id ?? null;
+
   updateStoreSubscriptionFields({
     storeId,
-    customerId: subscription.customer,
-    subscriptionId: subscription.id,
-    stripeStatus: subscription.status,
-    currentPeriodEndUnix: subscription.current_period_end,
+    customerId: full.customer,
+    subscriptionId: full.id,
+    stripeStatus: full.status,
+    currentPeriodEndUnix: full.current_period_end,
+    stripePriceId: priceId,
+    planTier: planTierFromStripePriceId(priceId),
   });
 }
 
@@ -99,7 +126,10 @@ function handleSubscriptionDeleted(subscription) {
   db.prepare(
     `
       UPDATE stores
-      SET subscription_status = 'canceled'
+      SET
+        subscription_status = 'canceled',
+        plan_tier = 'trial',
+        stripe_price_id = NULL
       WHERE stripe_subscription_id = ?
     `
   ).run(subscription.id);

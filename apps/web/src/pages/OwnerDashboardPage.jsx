@@ -276,6 +276,29 @@ export function OwnerDashboardPage({
   const [imageUploading, setImageUploading] = useState(false);
   const [dashboardMsg, setDashboardMsg] = useState("");
 
+  const [memoryFacts, setMemoryFacts] = useState([]);
+  const [memoryFactsLoading, setMemoryFactsLoading] = useState(false);
+  const [memoryFactsError, setMemoryFactsError] = useState("");
+  const [memoryNewText, setMemoryNewText] = useState("");
+  const [memorySaving, setMemorySaving] = useState(false);
+
+  const [aiFollowups, setAiFollowups] = useState([]);
+  const [aiFollowupsLoading, setAiFollowupsLoading] = useState(false);
+  const [aiFollowupsError, setAiFollowupsError] = useState("");
+  const [aiFollowupNewText, setAiFollowupNewText] = useState("");
+  const [aiFollowupSaving, setAiFollowupSaving] = useState(false);
+
+  const canAiFollowups = useMemo(() => {
+    if (!billingStatus?.billing_enforced) return true;
+    const caps = billingStatus?.capabilities;
+    return Array.isArray(caps) && caps.includes("ai_followups");
+  }, [billingStatus]);
+
+  const canCustomerMemory = useMemo(() => {
+    if (!billingStatus?.billing_enforced) return true;
+    const caps = billingStatus?.capabilities;
+    return Array.isArray(caps) && caps.includes("customer_memory");
+  }, [billingStatus]);
   useEffect(() => {
     if (!storeId) {
       setSummary(null);
@@ -300,6 +323,80 @@ export function OwnerDashboardPage({
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [panel]);
+
+  useEffect(() => {
+    if (!storeId || panel !== "ai" || !canCustomerMemory) {
+      setMemoryFacts([]);
+      setMemoryFactsError("");
+      setMemoryFactsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setMemoryFactsLoading(true);
+      setMemoryFactsError("");
+      try {
+        const res = await authFetch(`/api/stores/${encodeURIComponent(storeId)}/memory-facts`);
+        const body = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.status === 403 && body.code === "PLAN_REQUIRED") {
+          setMemoryFacts([]);
+          setMemoryFactsError("PLAN_REQUIRED");
+          return;
+        }
+        if (!res.ok) {
+          throw new Error(body.message || `تعذّر التحميل (${res.status})`);
+        }
+        setMemoryFacts(Array.isArray(body.data) ? body.data : []);
+      } catch (e) {
+        if (!cancelled) {
+          setMemoryFactsError(e.message || "تعذّر تحميل الذاكرة التشغيلية.");
+        }
+      } finally {
+        if (!cancelled) setMemoryFactsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId, panel, canCustomerMemory]);
+
+  useEffect(() => {
+    if (!storeId || panel !== "ai" || !canAiFollowups) {
+      setAiFollowups([]);
+      setAiFollowupsError("");
+      setAiFollowupsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setAiFollowupsLoading(true);
+      setAiFollowupsError("");
+      try {
+        const res = await authFetch(`/api/stores/${encodeURIComponent(storeId)}/ai-followups`);
+        const body = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.status === 403 && body.code === "PLAN_REQUIRED") {
+          setAiFollowups([]);
+          setAiFollowupsError("PLAN_REQUIRED");
+          return;
+        }
+        if (!res.ok) {
+          throw new Error(body.message || `تعذّر التحميل (${res.status})`);
+        }
+        setAiFollowups(Array.isArray(body.data) ? body.data : []);
+      } catch (e) {
+        if (!cancelled) {
+          setAiFollowupsError(e.message || "تعذّر تحميل عبارات المتابعة.");
+        }
+      } finally {
+        if (!cancelled) setAiFollowupsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId, panel, canAiFollowups]);
 
   useEffect(() => {
     const selected = products.find((product) => product.id === selectedProductId);
@@ -394,6 +491,98 @@ export function OwnerDashboardPage({
       setSettingsError(error.message || "تعذر حفظ إعدادات المتجر.");
     } finally {
       setSettingsSaving(false);
+    }
+  }
+
+  async function addMemoryFact() {
+    if (!storeId || !memoryNewText.trim()) return;
+    setMemorySaving(true);
+    setMemoryFactsError("");
+    try {
+      const res = await authFetch(`/api/stores/${encodeURIComponent(storeId)}/memory-facts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fact_text: memoryNewText.trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.message || `تعذّر الإضافة (${res.status})`);
+      }
+      if (body.data) {
+        setMemoryFacts((prev) => [...prev, body.data]);
+      }
+      setMemoryNewText("");
+    } catch (e) {
+      setMemoryFactsError(e.message || "تعذّر إضافة الحقيقة.");
+    } finally {
+      setMemorySaving(false);
+    }
+  }
+
+  async function removeMemoryFact(id) {
+    if (!storeId || !id) return;
+    setMemorySaving(true);
+    setMemoryFactsError("");
+    try {
+      const res = await authFetch(
+        `/api/stores/${encodeURIComponent(storeId)}/memory-facts/${encodeURIComponent(id)}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok && res.status !== 204) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || `تعذّر الحذف (${res.status})`);
+      }
+      setMemoryFacts((prev) => prev.filter((f) => f.id !== id));
+    } catch (e) {
+      setMemoryFactsError(e.message || "تعذّر حذف الحقيقة.");
+    } finally {
+      setMemorySaving(false);
+    }
+  }
+
+  async function addAiFollowup() {
+    if (!storeId || !aiFollowupNewText.trim()) return;
+    setAiFollowupSaving(true);
+    setAiFollowupsError("");
+    try {
+      const res = await authFetch(`/api/stores/${encodeURIComponent(storeId)}/ai-followups`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ followup_text: aiFollowupNewText.trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.message || `تعذّر الإضافة (${res.status})`);
+      }
+      if (body.data) {
+        setAiFollowups((prev) => [...prev, body.data]);
+      }
+      setAiFollowupNewText("");
+    } catch (e) {
+      setAiFollowupsError(e.message || "تعذّر إضافة العبارة.");
+    } finally {
+      setAiFollowupSaving(false);
+    }
+  }
+
+  async function removeAiFollowup(id) {
+    if (!storeId || !id) return;
+    setAiFollowupSaving(true);
+    setAiFollowupsError("");
+    try {
+      const res = await authFetch(
+        `/api/stores/${encodeURIComponent(storeId)}/ai-followups/${encodeURIComponent(id)}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok && res.status !== 204) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || `تعذّر الحذف (${res.status})`);
+      }
+      setAiFollowups((prev) => prev.filter((f) => f.id !== id));
+    } catch (e) {
+      setAiFollowupsError(e.message || "تعذّر حذف العبارة.");
+    } finally {
+      setAiFollowupSaving(false);
     }
   }
 
@@ -1521,6 +1710,147 @@ export function OwnerDashboardPage({
                 {settingsSaving ? "جاري الحفظ..." : "حفظ تعليمات AI"}
               </button>
               {settingsMsg && <p className="owner-dashboard__success">{settingsMsg}</p>}
+
+              {canCustomerMemory ? (
+                <div className="owner-dashboard__memory">
+                  <h3 className="owner-dashboard__memory-title">ذاكرة تشغيلية للمساعد</h3>
+                  <p className="owner-dashboard__muted owner-dashboard__muted--tight">
+                    حقائق قصيرة (سياسات، مواعيد، شحن…) تُدمَج في توجيه المساعد في شات المتجر العام — حتى 40
+                    نقطة.
+                  </p>
+                  {memoryFactsError === "PLAN_REQUIRED" ? (
+                    <p className="owner-dashboard__error">
+                      هذه الخاصية تتطلب خطة <strong>Pro</strong>.
+                      <button type="button" className="dm-btn dm-btn--ghost dm-btn--sm" onClick={() => onNavigate?.("upgrade")}>
+                        خطط الاشتراك
+                      </button>
+                    </p>
+                  ) : memoryFactsError ? (
+                    <p className="owner-dashboard__error">{memoryFactsError}</p>
+                  ) : null}
+                  {memoryFactsLoading && <p className="owner-dashboard__muted">جاري التحميل…</p>}
+                  {!memoryFactsLoading && memoryFacts.length === 0 && !memoryFactsError && (
+                    <p className="owner-dashboard__muted">لا توجد حقائق بعد.</p>
+                  )}
+                  <ul className="owner-dashboard__memory-list">
+                    {memoryFacts.map((f) => (
+                      <li key={f.id} className="owner-dashboard__memory-item">
+                        <p className="owner-dashboard__memory-text">{f.fact_text}</p>
+                        <button
+                          type="button"
+                          className="dm-btn dm-btn--ghost dm-btn--sm"
+                          disabled={memorySaving}
+                          onClick={() => removeMemoryFact(f.id)}
+                        >
+                          حذف
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <label className="owner-dashboard__memory-add">
+                    <span>إضافة حقيقة</span>
+                    <textarea
+                      rows={2}
+                      value={memoryNewText}
+                      onChange={(e) => setMemoryNewText(e.target.value)}
+                      placeholder="مثال: نوصّل داخل الرياض فقط يوميًّا عدا الجمعة."
+                      disabled={memorySaving}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="dm-btn dm-btn--secondary"
+                    disabled={memorySaving || !memoryNewText.trim()}
+                    onClick={() => void addMemoryFact()}
+                  >
+                    {memorySaving ? "جاري الإضافة…" : "إضافة للذاكرة"}
+                  </button>
+                </div>
+              ) : billingStatus?.billing_enforced ? (
+                <div className="owner-dashboard__memory owner-dashboard__memory--gate">
+                  <p className="owner-dashboard__muted">
+                    <strong>ذاكرة المساعد التشغيلية</strong> (حقائق ثابتة في البرومبت) متاحة في خطة{" "}
+                    <strong>Pro</strong>.
+                  </p>
+                  <button type="button" className="dm-btn dm-btn--primary" onClick={() => onNavigate?.("upgrade")}>
+                    ترقية لـ Pro
+                  </button>
+                </div>
+              ) : (
+                <p className="owner-dashboard__muted owner-dashboard__muted--tight">
+                  محليًا: عند فرض الفوترة واختيار Pro ستُدمَج «حقائق الذاكرة» في شات المتجر تلقائيًا.
+                </p>
+              )}
+
+              {canAiFollowups ? (
+                <div className="owner-dashboard__memory owner-dashboard__memory--followups">
+                  <h3 className="owner-dashboard__memory-title">عبارات متابعة في الشات</h3>
+                  <p className="owner-dashboard__muted owner-dashboard__muted--tight">
+                    جمل قصيرة (تذكير لطيف، شكر، عرض مساعدة إضافية…) يختار المساعد دمجها عندما يناسب سياق
+                    الحديث — حتى 40 عبارة.
+                  </p>
+                  {aiFollowupsError === "PLAN_REQUIRED" ? (
+                    <p className="owner-dashboard__error">
+                      هذه الخاصية تتطلب خطة <strong>Pro</strong>.
+                      <button type="button" className="dm-btn dm-btn--ghost dm-btn--sm" onClick={() => onNavigate?.("upgrade")}>
+                        خطط الاشتراك
+                      </button>
+                    </p>
+                  ) : aiFollowupsError ? (
+                    <p className="owner-dashboard__error">{aiFollowupsError}</p>
+                  ) : null}
+                  {aiFollowupsLoading && <p className="owner-dashboard__muted">جاري التحميل…</p>}
+                  {!aiFollowupsLoading && aiFollowups.length === 0 && !aiFollowupsError && (
+                    <p className="owner-dashboard__muted">لا توجد عبارات بعد.</p>
+                  )}
+                  <ul className="owner-dashboard__memory-list">
+                    {aiFollowups.map((f) => (
+                      <li key={f.id} className="owner-dashboard__memory-item">
+                        <p className="owner-dashboard__memory-text">{f.followup_text}</p>
+                        <button
+                          type="button"
+                          className="dm-btn dm-btn--ghost dm-btn--sm"
+                          disabled={aiFollowupSaving}
+                          onClick={() => void removeAiFollowup(f.id)}
+                        >
+                          حذف
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <label className="owner-dashboard__memory-add">
+                    <span>إضافة عبارة</span>
+                    <textarea
+                      rows={2}
+                      value={aiFollowupNewText}
+                      onChange={(e) => setAiFollowupNewText(e.target.value)}
+                      placeholder="مثال: إذا احتجت أي مقاس آخر خبرني قبل إتمام الطلب."
+                      disabled={aiFollowupSaving}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="dm-btn dm-btn--secondary"
+                    disabled={aiFollowupSaving || !aiFollowupNewText.trim()}
+                    onClick={() => void addAiFollowup()}
+                  >
+                    {aiFollowupSaving ? "جاري الإضافة…" : "إضافة عبارة"}
+                  </button>
+                </div>
+              ) : billingStatus?.billing_enforced ? (
+                <div className="owner-dashboard__memory owner-dashboard__memory--gate owner-dashboard__memory--followups">
+                  <p className="owner-dashboard__muted">
+                    <strong>عبارات المتابعة في الشات</strong> متاحة في خطة <strong>Pro</strong>.
+                  </p>
+                  <button type="button" className="dm-btn dm-btn--primary" onClick={() => onNavigate?.("upgrade")}>
+                    ترقية لـ Pro
+                  </button>
+                </div>
+              ) : (
+                <p className="owner-dashboard__muted owner-dashboard__muted--tight">
+                  محليًا: عند فرض الفوترة واختيار Pro ستُدمَج عبارات المتابعة في توجيه مساعد الشات العام.
+                </p>
+              )}
             </>
           )}
         </article>
