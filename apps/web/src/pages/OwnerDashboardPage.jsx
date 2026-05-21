@@ -8,6 +8,7 @@ import {
 import { authFetch, getOwnerStoreIdFromAuth } from "../lib/auth";
 import { buildPublicStorefrontUrl } from "../lib/storefrontUrl";
 import { formatProductOptionSummary } from "../lib/productOptions";
+import { OwnerMetricCard } from "../components/OwnerMetricCard";
 import "./OwnerDashboardPage.css";
 
 const EMPTY_PRODUCT = {
@@ -136,6 +137,7 @@ function OwnerIncomeChartCard({ incomeChart }) {
   }));
 
   return (
+    <OwnerMetricCard glow="emerald" className="owner-dashboard__income-card-wrap">
     <div className="owner-dashboard__income-card">
       <div className="owner-dashboard__income-top">
         <div className="owner-dashboard__income-intro">
@@ -218,6 +220,7 @@ function OwnerIncomeChartCard({ incomeChart }) {
         </div>
       )}
     </div>
+    </OwnerMetricCard>
   );
 }
 
@@ -1146,7 +1149,7 @@ export function OwnerDashboardPage({
       {summary && (
         <>
           <section className="owner-dashboard__summary" aria-label="ملخص المتجر">
-            <article className="owner-dashboard__summary-card">
+            <OwnerMetricCard glow="emerald">
               <StatSpark values={[summary.total_products, summary.active_products, summary.total_products]} />
               <div className="owner-dashboard__summary-body">
                 <div>
@@ -1155,8 +1158,8 @@ export function OwnerDashboardPage({
                 </div>
                 <strong>{summary.total_products}</strong>
               </div>
-            </article>
-            <article className="owner-dashboard__summary-card is-attention">
+            </OwnerMetricCard>
+            <OwnerMetricCard glow="amber" attention>
               <StatSpark values={[summary.new_orders, summary.new_orders + 1, 0, summary.new_orders]} />
               <div className="owner-dashboard__summary-body">
                 <div>
@@ -1165,8 +1168,8 @@ export function OwnerDashboardPage({
                 </div>
                 <strong>{summary.new_orders}</strong>
               </div>
-            </article>
-            <article className="owner-dashboard__summary-card">
+            </OwnerMetricCard>
+            <OwnerMetricCard glow="amber">
               <StatSpark
                 values={[summary.low_stock_variants, 3, summary.low_stock_variants, 1]}
               />
@@ -1177,8 +1180,8 @@ export function OwnerDashboardPage({
                 </div>
                 <strong>{summary.low_stock_variants}</strong>
               </div>
-            </article>
-            <article className="owner-dashboard__summary-card owner-dashboard__summary-card--wide">
+            </OwnerMetricCard>
+            <OwnerMetricCard glow="emerald" wide>
               <StatSpark values={[1, 2, 3, 4, 5]} />
               <div className="owner-dashboard__summary-body">
                 <div>
@@ -1193,7 +1196,7 @@ export function OwnerDashboardPage({
                   {summary.latest_order ? `#${summary.latest_order.id}` : "—"}
                 </strong>
               </div>
-            </article>
+            </OwnerMetricCard>
           </section>
 
           {(() => {
@@ -1203,7 +1206,7 @@ export function OwnerDashboardPage({
               className="owner-dashboard__summary owner-dashboard__summary--analytics"
               aria-label="مقاييس متقدمة"
             >
-              <article className="owner-dashboard__summary-card">
+              <OwnerMetricCard glow="emerald">
                 <StatSpark
                   values={[
                     analytics.clv.avg_revenue_per_customer,
@@ -1221,9 +1224,9 @@ export function OwnerDashboardPage({
                   </div>
                   <strong>{formatUsd(analytics.clv.avg_revenue_per_customer)}</strong>
                 </div>
-              </article>
+              </OwnerMetricCard>
 
-              <article className="owner-dashboard__summary-card">
+              <OwnerMetricCard glow="cyan">
                 <StatSpark
                   values={[
                     analytics.retention_30d.repeat_customers_30d,
@@ -1249,9 +1252,9 @@ export function OwnerDashboardPage({
                       : `${analytics.retention_30d.rate_percent}%`}
                   </strong>
                 </div>
-              </article>
+              </OwnerMetricCard>
 
-              <article className="owner-dashboard__summary-card">
+              <OwnerMetricCard glow="cyan">
                 <StatSpark
                   values={[
                     analytics.cart_abandonment.abandoned_sessions,
@@ -1275,9 +1278,9 @@ export function OwnerDashboardPage({
                       : `${analytics.cart_abandonment.rate_percent}%`}
                   </strong>
                 </div>
-              </article>
+              </OwnerMetricCard>
 
-              <article className="owner-dashboard__summary-card owner-dashboard__summary-card--inventory">
+              <OwnerMetricCard glow="amber" inventory>
                 <StatSpark
                   values={[
                     analytics.inventory_turnover.slow_movers.length,
@@ -1336,9 +1339,9 @@ export function OwnerDashboardPage({
                     </ul>
                   </div>
                 </div>
-              </article>
+              </OwnerMetricCard>
 
-              <article className="owner-dashboard__summary-card">
+              <OwnerMetricCard glow="indigo">
                 <StatSpark
                   values={
                     analytics.sales_forecast.monthly_series.length > 0
@@ -1360,7 +1363,7 @@ export function OwnerDashboardPage({
                       : formatUsd(analytics.sales_forecast.next_month_expected)}
                   </strong>
                 </div>
-              </article>
+              </OwnerMetricCard>
             </section>
             );
           })()}

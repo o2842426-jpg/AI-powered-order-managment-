@@ -12,6 +12,16 @@
   box-shadow: 0 12px 34px rgba(15, 23, 42, 0.08);
 }
 
+.create-store__brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+
+.create-store__brand .brand-mark__text strong {
+  color: #111827;
+}
+
 .create-store__eyebrow {
   margin: 0 0 0.3rem;
   color: #6366f1;

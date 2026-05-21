@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { apiUrl } from "../lib/api";
 import { storeAuth } from "../lib/auth";
+import { BrandMark } from "../components/BrandMark";
 import "./OwnerLoginPage.css";
 
 export function OwnerLoginPage({ onAuthenticated, onGoCreateStore }) {
@@ -68,6 +69,9 @@ export function OwnerLoginPage({ onAuthenticated, onGoCreateStore }) {
   return (
     <section className="owner-login">
       <div className="owner-login__card">
+        <div className="owner-login__brand">
+          <BrandMark showTagline={false} />
+        </div>
         <p className="owner-login__eyebrow">Owner Access</p>
         <h1>{mode === "register" ? "إنشاء حساب مالك" : "دخول صاحب المتجر"}</h1>
         <p>

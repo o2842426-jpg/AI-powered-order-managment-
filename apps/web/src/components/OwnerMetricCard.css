@@ -1,0 +1,54 @@
+.owner-metric-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--owner-space-4, 24px);
+  min-height: 148px;
+  padding: var(--owner-space-5, 32px);
+  border-radius: var(--owner-radius-lg, 16px);
+  background: var(--owner-color-surface, #18181b);
+  border: 1px solid var(--owner-color-border, #27272a);
+  overflow: hidden;
+  isolation: isolate;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.owner-metric-card--wide {
+  grid-column: span 1;
+}
+
+.owner-metric-card--inventory {
+  grid-column: span 2;
+  min-height: 280px;
+}
+
+.owner-metric-card--attention {
+  border-color: color-mix(in srgb, var(--owner-color-warning, #f59e0b) 28%, var(--owner-color-border));
+}
+
+.owner-metric-card__glow {
+  position: absolute;
+  inset: -40%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  background: radial-gradient(
+    ellipse 70% 55% at 50% 100%,
+    rgba(var(--metric-glow-rgb, 16, 185, 129), 0.22),
+    rgba(var(--metric-glow-rgb, 16, 185, 129), 0.06) 45%,
+    transparent 72%
+  );
+  filter: blur(28px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .owner-metric-card:hover {
+    border-color: color-mix(in srgb, rgb(var(--metric-glow-rgb)) 35%, var(--owner-color-border));
+    box-shadow: 0 0 0 1px color-mix(in srgb, rgb(var(--metric-glow-rgb)) 12%, transparent);
+  }
+}
+
+.owner-metric-card > *:not(.owner-metric-card__glow) {
+  position: relative;
+  z-index: 1;
+}

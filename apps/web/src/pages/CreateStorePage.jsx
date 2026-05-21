@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { apiUrl } from "../lib/api";
 import { rememberPublicStoreSlug } from "../lib/publicStoreSlug";
 import { storeAuth } from "../lib/auth";
+import { BrandMark } from "../components/BrandMark";
 import "./CreateStorePage.css";
 
 function normalizeSlugPreview(input) {
@@ -75,6 +76,9 @@ export function CreateStorePage({ onDone, onBackToLogin }) {
   return (
     <section className="create-store">
       <div className="create-store__card">
+        <div className="create-store__brand">
+          <BrandMark showTagline={false} />
+        </div>
         <p className="create-store__eyebrow">بداية جديدة</p>
         <h1>أنشئ متجرك</h1>
         <p className="create-store__lead">

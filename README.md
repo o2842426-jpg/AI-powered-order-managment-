@@ -1,4 +1,4 @@
-# DM Commerce
+# ShopIQ
 
 AI-powered order management system for Instagram shops and small online stores.
 

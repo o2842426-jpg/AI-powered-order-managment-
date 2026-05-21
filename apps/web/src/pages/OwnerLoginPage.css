@@ -12,6 +12,16 @@
   box-shadow: 0 12px 34px rgba(15, 23, 42, 0.08);
 }
 
+.owner-login__brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+
+.owner-login__brand .brand-mark__text strong {
+  color: #111827;
+}
+
 .owner-login__eyebrow {
   margin: 0 0 0.3rem;
   color: #6366f1;

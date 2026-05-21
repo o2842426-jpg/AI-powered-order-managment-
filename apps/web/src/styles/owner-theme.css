@@ -1,0 +1,64 @@
+/**
+ * Owner console — midnight SaaS palette (Stripe / Linear inspired).
+ * Scoped to .owner-shell so storefront stays unchanged.
+ */
+.owner-shell {
+  --owner-bg: #09090b;
+  --owner-color-surface: #18181b;
+  --owner-color-surface-raised: #1f1f23;
+  --owner-color-border: #27272a;
+  --owner-color-border-subtle: #3f3f46;
+  --owner-color-text: #fafafa;
+  --owner-color-muted: #71717a;
+  --owner-color-primary: #a78bfa;
+  --owner-color-primary-hover: #7c3aed;
+  --owner-color-accent-cyan: #22d3ee;
+  --owner-gradient-brand: linear-gradient(165deg, #c4b5fd 0%, #7c3aed 48%, #22d3ee 100%);
+  --owner-color-success: #34d399;
+  --owner-color-warning: #fbbf24;
+  --owner-color-danger: #f87171;
+  --owner-radius-lg: 16px;
+  --owner-radius-md: 12px;
+  --owner-radius-pill: 999px;
+  --owner-space-4: 24px;
+  --owner-space-5: 32px;
+  --owner-space-6: 24px;
+  --owner-shadow-soft: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 32px rgba(0, 0, 0, 0.35);
+  --owner-font: "IBM Plex Sans Arabic", "Inter", system-ui, -apple-system, sans-serif;
+  --owner-font-metric: "Inter", "IBM Plex Sans Arabic", system-ui, sans-serif;
+
+  background: var(--owner-bg);
+  color: var(--owner-color-text);
+  font-family: var(--owner-font);
+  font-feature-settings: "kern" 1, "liga" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.owner-shell .owner-dashboard,
+.owner-shell .owner-dashboard * {
+  font-family: inherit;
+}
+
+.owner-shell .owner-dashboard strong,
+.owner-shell .owner-dashboard .owner-dashboard__summary-body strong {
+  font-family: var(--owner-font-metric);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  color: var(--owner-color-text);
+}
+
+.owner-shell .owner-dashboard__muted,
+.owner-shell .owner-dashboard small,
+.owner-shell .owner-dashboard__summary-body span,
+.owner-shell .owner-dashboard__summary-body small,
+.owner-shell .owner-dashboard__hero-lead,
+.owner-shell .owner-dashboard__hero-summary,
+.owner-shell .owner-dashboard__section-desc,
+.owner-shell .owner-dashboard__turnover-list li small {
+  color: var(--owner-color-muted);
+}
+
+.owner-shell .owner-dashboard__eyebrow {
+  color: var(--owner-color-primary) !important;
+}

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { BrandMark } from "./BrandMark";
 import "./OwnerShell.css";
 
 const NAV_ITEMS = [
@@ -135,11 +136,7 @@ export function OwnerShell({
     <div className="owner-shell">
       <aside className="owner-shell__sidebar" aria-label="قائمة لوحة المالك">
         <div className="owner-shell__brand">
-          <span className="owner-shell__logo">DM</span>
-          <div>
-            <strong>DM Commerce</strong>
-            <span>تجارة وذكاء اصطناعي</span>
-          </div>
+          <BrandMark />
         </div>
 
         <nav className="owner-shell__nav">

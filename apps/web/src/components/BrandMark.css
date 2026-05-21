@@ -1,0 +1,52 @@
+.brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.brand-mark__logo {
+  flex-shrink: 0;
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 8px 24px rgba(124, 58, 237, 0.28);
+}
+
+.brand-mark--sm .brand-mark__logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.brand-mark--md .brand-mark__logo {
+  width: 44px;
+  height: 44px;
+}
+
+.brand-mark__text {
+  min-width: 0;
+}
+
+.brand-mark__text strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--owner-color-text, #fafafa);
+  line-height: 1.2;
+}
+
+.brand-mark--sm .brand-mark__text strong {
+  font-size: 0.88rem;
+}
+
+.brand-mark__text span {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--owner-color-muted, #71717a);
+  line-height: 1.35;
+}
