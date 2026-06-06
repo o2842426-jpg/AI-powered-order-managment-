@@ -1,12 +1,14 @@
 /**
  * Meta Instagram webhook — HTTP layer (Phase 1).
- * GET: subscription handshake only. POST handler added in a later step.
+ * GET: subscription handshake.
+ * POST: HMAC verify → parse messaging → audit log (no AI yet).
  */
+
+const { verifyMetaSignature } = require("./instagram.webhook.signature");
+const { processInstagramWebhookPayload } = require("./instagram.webhook.service");
 
 /**
  * Meta subscription verification (GET /api/webhooks/instagram).
- * Meta sends hub.mode, hub.verify_token, hub.challenge; we echo hub.challenge on success.
- *
  * @param {import("express").Request} req
  * @param {import("express").Response} res
  */
@@ -31,6 +33,47 @@ function verifyInstagramWebhook(req, res) {
   return res.status(200).send(String(challenge));
 }
 
+/**
+ * Inbound Meta webhook (POST /api/webhooks/instagram).
+ * Requires express.raw on this route so req.body is a Buffer.
+ *
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ */
+function handleInstagramWebhookPost(req, res) {
+  const rawBody = req.body;
+
+  if (!Buffer.isBuffer(rawBody) || rawBody.length === 0) {
+    return res.sendStatus(400);
+  }
+
+  const signatureHeader = req.get("X-Hub-Signature-256");
+  if (!verifyMetaSignature(rawBody, signatureHeader)) {
+    console.warn("[instagram-webhook] rejected POST — invalid or missing signature");
+    return res.sendStatus(403);
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(rawBody.toString("utf8"));
+  } catch (err) {
+    console.warn("[instagram-webhook] rejected POST — invalid JSON:", err?.message);
+    return res.sendStatus(400);
+  }
+
+  try {
+    const stats = processInstagramWebhookPayload(payload);
+    if (stats.recorded > 0 || stats.skipped_duplicate > 0) {
+      console.info("[instagram-webhook] batch stats", stats);
+    }
+  } catch (err) {
+    console.error("[instagram-webhook] processing error:", err?.message || err);
+  }
+
+  return res.sendStatus(200);
+}
+
 module.exports = {
   verifyInstagramWebhook,
+  handleInstagramWebhookPost,
 };

@@ -20,6 +20,7 @@ function migrate(db) {
   ensureStoreAiFollowupsTable(db);
   ensureChatFollowupTasksTable(db);
   ensureChatSessionLeadScoreColumns(db);
+  ensureWebhookEventsTable(db);
 }
 
 function ensureStoreSettingsColumns(db) {
@@ -219,6 +220,30 @@ function ensureChatFollowupTasksTable(db) {
       CHECK (status IN ('open', 'done', 'dismissed'))
     );
     CREATE INDEX idx_chat_followup_tasks_store_status ON chat_followup_tasks(store_id, status);
+  `);
+}
+
+function ensureWebhookEventsTable(db) {
+  const row = db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'webhook_events'"
+    )
+    .get();
+  if (row) return;
+  db.exec(`
+    CREATE TABLE webhook_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      platform TEXT NOT NULL,
+      event_id TEXT NOT NULL,
+      event_type TEXT NOT NULL DEFAULT 'message',
+      store_id INTEGER,
+      processed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      raw_payload TEXT,
+      error TEXT,
+      UNIQUE(platform, event_id)
+    );
+    CREATE INDEX idx_webhook_events_platform_processed
+      ON webhook_events(platform, processed_at);
   `);
 }
 
