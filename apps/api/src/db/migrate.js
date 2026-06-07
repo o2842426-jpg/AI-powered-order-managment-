@@ -21,6 +21,7 @@ function migrate(db) {
   ensureChatFollowupTasksTable(db);
   ensureChatSessionLeadScoreColumns(db);
   ensureWebhookEventsTable(db);
+  ensureChannelTables(db);
 }
 
 function ensureStoreSettingsColumns(db) {
@@ -244,6 +245,101 @@ function ensureWebhookEventsTable(db) {
     );
     CREATE INDEX idx_webhook_events_platform_processed
       ON webhook_events(platform, processed_at);
+  `);
+}
+
+function ensureChannelTables(db) {
+  const row = db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'channel_connections'"
+    )
+    .get();
+  if (row) return;
+
+  db.exec(`
+    CREATE TABLE channel_connections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      store_id INTEGER NOT NULL,
+      platform TEXT NOT NULL DEFAULT 'instagram',
+      platform_page_id TEXT NOT NULL,
+      platform_instagram_id TEXT NOT NULL,
+      page_name TEXT,
+      access_token_enc TEXT NOT NULL,
+      token_expires_at TEXT,
+      webhook_subscribed INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      metadata TEXT,
+      connected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
+      UNIQUE(store_id, platform),
+      UNIQUE(platform, platform_instagram_id),
+      CHECK (webhook_subscribed IN (0, 1)),
+      CHECK (status IN ('active', 'revoked', 'error'))
+    );
+    CREATE INDEX idx_channel_connections_page
+      ON channel_connections(platform_page_id);
+    CREATE INDEX idx_channel_connections_ig
+      ON channel_connections(platform_instagram_id);
+    CREATE INDEX idx_channel_connections_store
+      ON channel_connections(store_id, platform);
+
+    CREATE TABLE channel_conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      store_id INTEGER NOT NULL,
+      channel_connection_id INTEGER NOT NULL,
+      platform TEXT NOT NULL DEFAULT 'instagram',
+      platform_thread_id TEXT NOT NULL,
+      platform_user_id TEXT NOT NULL,
+      platform_username TEXT,
+      customer_id INTEGER,
+      owner_takeover INTEGER NOT NULL DEFAULT 0,
+      lead_score INTEGER,
+      lead_score_reason TEXT,
+      lead_scored_at TEXT,
+      last_message_at TEXT,
+      last_customer_message_at TEXT,
+      status TEXT NOT NULL DEFAULT 'open',
+      metadata TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
+      FOREIGN KEY (channel_connection_id) REFERENCES channel_connections(id) ON DELETE CASCADE,
+      FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
+      UNIQUE(store_id, platform, platform_thread_id),
+      CHECK (owner_takeover IN (0, 1)),
+      CHECK (status IN ('open', 'archived'))
+    );
+    CREATE INDEX idx_channel_conversations_store_last
+      ON channel_conversations(store_id, last_message_at);
+    CREATE INDEX idx_channel_conversations_connection
+      ON channel_conversations(channel_connection_id);
+
+    CREATE TABLE channel_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id INTEGER NOT NULL,
+      store_id INTEGER NOT NULL,
+      platform TEXT NOT NULL DEFAULT 'instagram',
+      direction TEXT NOT NULL,
+      sender_type TEXT NOT NULL,
+      external_message_id TEXT,
+      message_type TEXT NOT NULL DEFAULT 'text',
+      body_text TEXT NOT NULL,
+      payload TEXT,
+      delivery_status TEXT NOT NULL DEFAULT 'received',
+      sent_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (conversation_id) REFERENCES channel_conversations(id) ON DELETE CASCADE,
+      FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
+      UNIQUE(platform, external_message_id),
+      CHECK (direction IN ('inbound', 'outbound')),
+      CHECK (sender_type IN ('customer', 'ai', 'owner', 'system')),
+      CHECK (delivery_status IN ('received', 'sent', 'failed'))
+    );
+    CREATE INDEX idx_channel_messages_conversation_created
+      ON channel_messages(conversation_id, created_at);
+    CREATE INDEX idx_channel_messages_store_created
+      ON channel_messages(store_id, created_at);
   `);
 }
 
