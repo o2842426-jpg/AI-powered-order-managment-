@@ -220,6 +220,152 @@ function persistInboundDmEvent(event) {
   return run();
 }
 
+/**
+ * @param {number} connectionId
+ * @returns {{
+ *   id: number,
+ *   store_id: number,
+ *   platform_instagram_id: string,
+ *   platform_page_id: string,
+ *   access_token_enc: string,
+ *   status: string
+ * } | null}
+ */
+function getActiveConnectionById(connectionId) {
+  return (
+    db
+      .prepare(
+        `
+          SELECT
+            id,
+            store_id,
+            platform_instagram_id,
+            platform_page_id,
+            access_token_enc,
+            status
+          FROM channel_connections
+          WHERE id = ? AND platform = ? AND status = 'active'
+        `
+      )
+      .get(connectionId, PLATFORM) || null
+  );
+}
+
+/**
+ * @param {number} conversationId
+ * @returns {{
+ *   id: number,
+ *   store_id: number,
+ *   channel_connection_id: number,
+ *   platform_thread_id: string,
+ *   platform_user_id: string,
+ *   owner_takeover: number,
+ *   status: string
+ * } | null}
+ */
+function getConversationById(conversationId) {
+  return (
+    db
+      .prepare(
+        `
+          SELECT
+            id,
+            store_id,
+            channel_connection_id,
+            platform_thread_id,
+            platform_user_id,
+            owner_takeover,
+            status
+          FROM channel_conversations
+          WHERE id = ?
+        `
+      )
+      .get(conversationId) || null
+  );
+}
+
+/**
+ * @param {number} conversationId
+ * @param {number} [limit]
+ * @returns {Array<{ sender_type: string, message_text: string }>}
+ */
+function listChannelMessagesForAi(conversationId, limit = 8) {
+  return db
+    .prepare(
+      `
+        SELECT sender_type, body_text AS message_text
+        FROM channel_messages
+        WHERE conversation_id = ?
+        ORDER BY id DESC
+        LIMIT ?
+      `
+    )
+    .all(conversationId, limit)
+    .reverse();
+}
+
+/**
+ * @param {{
+ *   conversationId: number,
+ *   storeId: number,
+ *   mid?: string | null,
+ *   text: string,
+ *   senderType?: string,
+ *   deliveryStatus?: string,
+ *   payload?: object | null,
+ *   sentAt?: string | null
+ * }} input
+ */
+function insertOutboundChannelMessage({
+  conversationId,
+  storeId,
+  mid = null,
+  text,
+  senderType = "ai",
+  deliveryStatus = "sent",
+  payload = null,
+  sentAt = null,
+}) {
+  const at = sentAt || new Date().toISOString();
+
+  db.prepare(
+    `
+      INSERT INTO channel_messages (
+        conversation_id,
+        store_id,
+        platform,
+        direction,
+        sender_type,
+        external_message_id,
+        message_type,
+        body_text,
+        payload,
+        delivery_status,
+        sent_at
+      )
+      VALUES (?, ?, ?, 'outbound', ?, ?, 'text', ?, ?, ?, ?)
+    `
+  ).run(
+    conversationId,
+    storeId,
+    PLATFORM,
+    senderType,
+    mid,
+    text,
+    payload ? JSON.stringify(payload) : null,
+    deliveryStatus,
+    at
+  );
+
+  db.prepare(
+    `
+      UPDATE channel_conversations
+      SET last_message_at = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `
+  ).run(at, conversationId);
+}
+
 module.exports = {
   PLATFORM,
   metaTimestampToIso,
@@ -228,4 +374,8 @@ module.exports = {
   upsertConversationForInbound,
   insertInboundChannelMessage,
   persistInboundDmEvent,
+  getActiveConnectionById,
+  getConversationById,
+  listChannelMessagesForAi,
+  insertOutboundChannelMessage,
 };
