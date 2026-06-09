@@ -29,6 +29,9 @@ const {
   createStoreAiFollowup,
   deleteStoreAiFollowup,
 } = require("./aiFollowups.controller");
+const {
+  setChannelConversationTakeover,
+} = require("../channels/channel.conversations.controller");
 
 const storesRouter = express.Router();
 
@@ -54,6 +57,12 @@ storesRouter.post(
   "/:storeId/chat-sessions/:sessionId/owner-messages",
   requirePlanFeature("human_takeover"),
   postOwnerChatMessage
+);
+
+storesRouter.patch(
+  "/:storeId/channel-conversations/:conversationId/takeover",
+  requirePlanFeature("human_takeover"),
+  setChannelConversationTakeover
 );
 
 storesRouter.get(

@@ -366,6 +366,75 @@ function insertOutboundChannelMessage({
   ).run(at, conversationId);
 }
 
+/**
+ * @param {number} conversationId
+ * @param {number} storeId
+ * @returns {object | null}
+ */
+function getChannelConversationForStore(conversationId, storeId) {
+  return (
+    db
+      .prepare(
+        `
+          SELECT
+            id,
+            store_id,
+            channel_connection_id,
+            platform,
+            platform_thread_id,
+            platform_user_id,
+            platform_username,
+            customer_id,
+            owner_takeover,
+            lead_score,
+            lead_score_reason,
+            lead_scored_at,
+            last_message_at,
+            last_customer_message_at,
+            status,
+            metadata,
+            created_at,
+            updated_at
+          FROM channel_conversations
+          WHERE id = ? AND store_id = ?
+        `
+      )
+      .get(conversationId, storeId) || null
+  );
+}
+
+/**
+ * Takeover ON (1) = human handling, OFF (0) = AI handling.
+ *
+ * @param {{
+ *   conversationId: number,
+ *   storeId: number,
+ *   ownerTakeover: boolean
+ * }} input
+ * @returns {boolean}
+ */
+function updateChannelConversationTakeover({
+  conversationId,
+  storeId,
+  ownerTakeover,
+}) {
+  const flag = ownerTakeover ? 1 : 0;
+
+  const result = db
+    .prepare(
+      `
+        UPDATE channel_conversations
+        SET
+          owner_takeover = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND store_id = ?
+      `
+    )
+    .run(flag, conversationId, storeId);
+
+  return result.changes > 0;
+}
+
 module.exports = {
   PLATFORM,
   metaTimestampToIso,
@@ -378,4 +447,6 @@ module.exports = {
   getConversationById,
   listChannelMessagesForAi,
   insertOutboundChannelMessage,
+  getChannelConversationForStore,
+  updateChannelConversationTakeover,
 };
