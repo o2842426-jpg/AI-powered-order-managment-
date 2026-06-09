@@ -30,6 +30,8 @@ const {
   deleteStoreAiFollowup,
 } = require("./aiFollowups.controller");
 const {
+  listChannelConversations,
+  getChannelConversationDetail,
   setChannelConversationTakeover,
   postChannelOwnerMessage,
 } = require("../channels/channel.conversations.controller");
@@ -60,6 +62,16 @@ storesRouter.post(
   postOwnerChatMessage
 );
 
+storesRouter.get(
+  "/:storeId/channel-conversations",
+  requirePlanFeature("conversations_dashboard"),
+  listChannelConversations
+);
+storesRouter.get(
+  "/:storeId/channel-conversations/:conversationId",
+  requirePlanFeature("conversations_dashboard"),
+  getChannelConversationDetail
+);
 storesRouter.patch(
   "/:storeId/channel-conversations/:conversationId/takeover",
   requirePlanFeature("human_takeover"),

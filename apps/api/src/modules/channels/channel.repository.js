@@ -371,6 +371,44 @@ function insertOutboundChannelMessage({
  * @param {number} storeId
  * @returns {object | null}
  */
+/**
+ * @param {number} conversationId
+ * @param {number} [limit]
+ * @returns {Array<object>}
+ */
+function listChannelMessagesForStore(conversationId, limit = 500) {
+  return db
+    .prepare(
+      `
+        SELECT
+          id,
+          conversation_id,
+          store_id,
+          platform,
+          direction,
+          sender_type,
+          external_message_id,
+          message_type,
+          body_text,
+          body_text AS message_text,
+          payload,
+          delivery_status,
+          sent_at,
+          created_at
+        FROM channel_messages
+        WHERE conversation_id = ?
+        ORDER BY id ASC
+        LIMIT ?
+      `
+    )
+    .all(conversationId, limit);
+}
+
+/**
+ * @param {number} conversationId
+ * @param {number} storeId
+ * @returns {object | null}
+ */
 function getChannelConversationForStore(conversationId, storeId) {
   return (
     db
@@ -449,4 +487,5 @@ module.exports = {
   insertOutboundChannelMessage,
   getChannelConversationForStore,
   updateChannelConversationTakeover,
+  listChannelMessagesForStore,
 };

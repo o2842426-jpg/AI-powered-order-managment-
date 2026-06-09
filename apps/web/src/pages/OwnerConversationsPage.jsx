@@ -54,7 +54,7 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
     try {
       const q = search.trim() ? `&q=${encodeURIComponent(search.trim())}` : "";
       const res = await authFetch(
-        `/api/stores/${encodeURIComponent(storeId)}/chat-sessions?limit=80${q}`
+        `/api/stores/${encodeURIComponent(storeId)}/channel-conversations?limit=80${q}`
       );
       const body = await res.json().catch(() => ({}));
       if (res.status === 403 && body.code === "PLAN_REQUIRED") {
@@ -86,7 +86,7 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
       }
       try {
         const res = await authFetch(
-          `/api/stores/${encodeURIComponent(storeId)}/chat-sessions/${encodeURIComponent(sessionId)}`
+          `/api/stores/${encodeURIComponent(storeId)}/channel-conversations/${encodeURIComponent(sessionId)}`
         );
         const body = await res.json().catch(() => ({}));
         if (res.status === 403 && body.code === "PLAN_REQUIRED") {
@@ -98,7 +98,7 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
         }
         if (!res.ok) {
           if (silent && res.status === 404) {
-            setDetailError("الجلسة لم تعد متوفرة.");
+            setDetailError("المحادثة لم تعد متوفرة.");
             setDetail(null);
             setSelectedId(null);
             void loadSessionsRef.current();
@@ -233,7 +233,7 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
     setTakeoverGateError("");
     try {
       const res = await authFetch(
-        `/api/stores/${encodeURIComponent(storeId)}/chat-sessions/${encodeURIComponent(selectedId)}/takeover`,
+        `/api/stores/${encodeURIComponent(storeId)}/channel-conversations/${encodeURIComponent(selectedId)}/takeover`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -248,9 +248,11 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
       if (!res.ok) {
         throw new Error(body.message || `تعذّر التحديث (${res.status})`);
       }
-      const nextSession = body.data?.session;
-      if (nextSession) {
-        setDetail((d) => (d ? { ...d, session: { ...d.session, ...nextSession } } : d));
+      const nextConversation = body.data?.conversation;
+      if (nextConversation) {
+        setDetail((d) =>
+          d ? { ...d, conversation: { ...d.conversation, ...nextConversation } } : d
+        );
       }
       await loadSessions();
     } catch (e) {
@@ -268,7 +270,7 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
     setOwnerSendError("");
     try {
       const res = await authFetch(
-        `/api/stores/${encodeURIComponent(storeId)}/chat-sessions/${encodeURIComponent(selectedId)}/owner-messages`,
+        `/api/stores/${encodeURIComponent(storeId)}/channel-conversations/${encodeURIComponent(selectedId)}/messages`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -284,13 +286,15 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
         setOwnerSendError("TAKEOVER_REQUIRED");
         return;
       }
+      if (res.status === 502 && body.code === "INSTAGRAM_SEND_FAILED") {
+        setOwnerSendError(body.error || body.message || "تعذّر الإرسال إلى إنستغرام.");
+        return;
+      }
       if (!res.ok) {
         throw new Error(body.message || `تعذّر الإرسال (${res.status})`);
       }
       setOwnerComposerText("");
-      if (Array.isArray(body.data?.messages)) {
-        setDetail((d) => (d ? { ...d, messages: body.data.messages } : d));
-      }
+      await fetchSessionDetail(selectedId, { silent: true });
       await loadSessions();
     } catch (e) {
       setOwnerSendError(e.message || "تعذّر إرسال الرسالة.");
@@ -335,7 +339,7 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
           <p className="owner-conv__eyebrow">تشغيل المبيعات</p>
           <h1>المحادثات</h1>
           <p className="owner-conv__lead">
-            جلسات شات المتجر العامة — آخر نشاط، معاينة سريعة، وافتح الجلسة لقراءة كامل الخيط.
+            رسائل DM إنستغرام — آخر نشاط، معاينة سريعة، وتولّي المحادثة للرد اليدوي عند الحاجة.
           </p>
         </div>
         <div className="owner-conv__toolbar">
@@ -466,10 +470,12 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
       ) : null}
 
       <div className="owner-conv__layout">
-        <section className="owner-conv__list card" aria-label="قائمة الجلسات">
+        <section className="owner-conv__list card" aria-label="قائمة محادثات إنستغرام">
           {loading && <p className="owner-conv__status">جاري التحميل…</p>}
           {!loading && sessions.length === 0 && (
-            <p className="owner-conv__empty">لا توجد جلسات بعد — عندما يتحدث العملاء مع مساعد المتجر ستظهر هنا.</p>
+            <p className="owner-conv__empty">
+              لا توجد محادثات بعد — عندما يرسل العملاء DM على إنستغرام ستظهر هنا.
+            </p>
           )}
           <ul className="owner-conv__sessions">
             {sessions.map((row) => {
@@ -482,7 +488,8 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                     onClick={() => openSession(row.id)}
                   >
                     <span className="owner-conv__session-id">
-                      جلسة #{row.id}
+                      إنستغرام #{row.id}
+                      <span className="owner-conv__ig-pill">DM</span>
                       {Number(row.owner_takeover) === 1 ? (
                         <span className="owner-conv__takeover-pill">يدوي</span>
                       ) : null}
@@ -499,9 +506,9 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                       {formatDt(row.last_message_at || row.started_at)}
                       {row.message_count != null ? ` · ${row.message_count} رسالة` : ""}
                     </span>
-                    {(row.customer_name || row.customer_phone) && (
+                    {(row.customer_name || row.customer_phone || row.platform_username) && (
                       <span className="owner-conv__session-customer" dir="auto">
-                        {row.customer_name || "عميل"}
+                        {row.customer_name || row.platform_username || "عميل DM"}
                         {row.customer_phone ? ` · ${row.customer_phone}` : ""}
                       </span>
                     )}
@@ -515,11 +522,11 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
           </ul>
         </section>
 
-        <section className="owner-conv__detail card" aria-label="تفاصيل الجلسة">
+        <section className="owner-conv__detail card" aria-label="تفاصيل المحادثة">
           {!selectedId && (
-            <p className="owner-conv__placeholder">اختر جلسة من القائمة لعرض الرسائل.</p>
+            <p className="owner-conv__placeholder">اختر محادثة من القائمة لعرض الرسائل.</p>
           )}
-          {selectedId && detailLoading && <p className="owner-conv__status">جاري فتح الجلسة…</p>}
+          {selectedId && detailLoading && <p className="owner-conv__status">جاري فتح المحادثة…</p>}
           {selectedId && detailError === "PLAN_REQUIRED" && (
             <p className="owner-conv__error">هذه الخاصية تتطلب خطة أعلى.</p>
           )}
@@ -528,45 +535,57 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
               {detailError}
             </p>
           )}
-          {detail?.session && (
+          {detail?.conversation && (
             <>
+              {Number(detail.conversation.owner_takeover) === 1 ? (
+                <div className="owner-conv__takeover-banner" role="status">
+                  الـ AI صامت الآن — أنت تتحكم بالمحادثة على إنستغرام
+                </div>
+              ) : null}
               <div className="owner-conv__detail-head">
-                <h2>جلسة #{detail.session.id}</h2>
+                <h2>محادثة إنستغرام #{detail.conversation.id}</h2>
                 <p className="owner-conv__detail-sub">
-                  بدأت {formatDt(detail.session.started_at)}
-                  {detail.session.last_message_at
-                    ? ` · آخر نشاط ${formatDt(detail.session.last_message_at)}`
+                  بدأت {formatDt(detail.conversation.started_at || detail.conversation.created_at)}
+                  {detail.conversation.last_message_at
+                    ? ` · آخر نشاط ${formatDt(detail.conversation.last_message_at)}`
                     : ""}
                 </p>
-                {detail.session.lead_score != null && detail.session.lead_score !== "" ? (
+                {detail.conversation.lead_score != null && detail.conversation.lead_score !== "" ? (
                   <p className="owner-conv__lead-panel" dir="auto">
-                    <strong>تقييم اهتمام (إرشادي):</strong> {Number(detail.session.lead_score)}/100
-                    {detail.session.lead_score_reason ? (
+                    <strong>تقييم اهتمام (إرشادي):</strong> {Number(detail.conversation.lead_score)}/100
+                    {detail.conversation.lead_score_reason ? (
                       <span className="owner-conv__lead-panel__why">
                         {" "}
-                        — {String(detail.session.lead_score_reason)}
+                        — {String(detail.conversation.lead_score_reason)}
                       </span>
                     ) : null}
                   </p>
                 ) : null}
-                {(detail.session.customer_name || detail.session.customer_phone) && (
+                {(detail.conversation.customer_name ||
+                  detail.conversation.customer_phone ||
+                  detail.conversation.platform_username) && (
                   <p className="owner-conv__detail-customer" dir="auto">
-                    <strong>العميل:</strong> {detail.session.customer_name || "—"}
-                    {detail.session.customer_phone ? ` — ${detail.session.customer_phone}` : ""}
+                    <strong>العميل:</strong>{" "}
+                    {detail.conversation.customer_name ||
+                      detail.conversation.platform_username ||
+                      "—"}
+                    {detail.conversation.customer_phone
+                      ? ` — ${detail.conversation.customer_phone}`
+                      : ""}
                   </p>
                 )}
                 <div className="owner-conv__takeover-bar">
                   <div>
-                    <p className="owner-conv__takeover-title">الرد اليدوي (تولّي المحادثة)</p>
+                    <p className="owner-conv__takeover-title">الرد اليدوي (Takeover)</p>
                     <p className="owner-conv__takeover-desc">
-                      عند التفعيل يتوقّف المساعد الآلي عن الرد على هذا العميل في واجهة المتجر حتى تعطّل التولّي.
+                      عند التفعيل يتوقّف المساعد الآلي عن الرد في DM حتى تعطّل التولّي وتعود للـ AI.
                     </p>
                   </div>
                   <label className="owner-conv__takeover-switch">
                     <span className="visually-hidden">تفعيل الرد اليدوي</span>
                     <input
                       type="checkbox"
-                      checked={Number(detail.session.owner_takeover) === 1}
+                      checked={Number(detail.conversation.owner_takeover) === 1}
                       disabled={!canHumanTakeover || takeoverSaving || detailLoading}
                       onChange={(e) => setTakeoverEnabled(e.target.checked)}
                     />
@@ -612,7 +631,7 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                           ? "المالك"
                           : "المساعد"}
                     </span>
-                    <p className="owner-conv__bubble-text">{m.message_text}</p>
+                    <p className="owner-conv__bubble-text">{m.message_text || m.body_text}</p>
                     {m.sender_type === "customer" && m.lead_score != null && m.lead_score !== "" ? (
                       <p className="owner-conv__bubble-lead" dir="auto">
                         تقييم الرسالة: {Number(m.lead_score)}/100
@@ -625,17 +644,17 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
               </ul>
               <form className="owner-conv__owner-reply" onSubmit={sendOwnerReply}>
                 <label className="owner-conv__owner-reply-label">
-                  <span>ردّك كمالك (يظهر للعميل في المتجر)</span>
+                  <span>ردّك كمالك (يُرسل للعميل على إنستغرام)</span>
                   <textarea
                     rows={2}
                     value={ownerComposerText}
                     onChange={(e) => setOwnerComposerText(e.target.value)}
                     placeholder={
-                      Number(detail.session.owner_takeover) === 1
+                      Number(detail.conversation.owner_takeover) === 1
                         ? "اكتب رسالتك…"
-                        : "فعّل «الرد اليدوي» أعلاه لإرسال رسائل من هنا."
+                        : "فعّل «الرد اليدوي» أعلاه لإرسال رسائل DM من هنا."
                     }
-                    disabled={Number(detail.session.owner_takeover) !== 1 || ownerSending}
+                    disabled={Number(detail.conversation.owner_takeover) !== 1 || ownerSending}
                   />
                 </label>
                 {ownerSendError === "PLAN_REQUIRED" ? (
@@ -656,12 +675,12 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                     type="submit"
                     className="dm-btn dm-btn--primary"
                     disabled={
-                      Number(detail.session.owner_takeover) !== 1 ||
+                      Number(detail.conversation.owner_takeover) !== 1 ||
                       ownerSending ||
                       !ownerComposerText.trim()
                     }
                   >
-                    {ownerSending ? "جاري الإرسال…" : "إرسال للعميل"}
+                    {ownerSending ? "جاري الإرسال…" : "إرسال على إنستغرام"}
                   </button>
                 </div>
               </form>
