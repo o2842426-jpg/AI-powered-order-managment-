@@ -262,6 +262,10 @@ export function OwnerDashboardPage({
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMsg, setSettingsMsg] = useState("");
   const [settingsError, setSettingsError] = useState("");
+  const [igConnection, setIgConnection] = useState(null);
+  const [igConnectionLoading, setIgConnectionLoading] = useState(false);
+  const [igConnectError, setIgConnectError] = useState("");
+  const [igConnectStarting, setIgConnectStarting] = useState(false);
   const [publicLinkCopied, setPublicLinkCopied] = useState(false);
 
   const [products, setProducts] = useState([]);
@@ -326,6 +330,17 @@ export function OwnerDashboardPage({
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [panel]);
+
+  useEffect(() => {
+    if (!storeId || panel !== "settings") {
+      setIgConnection(null);
+      setIgConnectError("");
+      setIgConnectionLoading(false);
+      return;
+    }
+    void loadInstagramConnection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, panel]);
 
   useEffect(() => {
     if (!storeId || panel !== "ai" || !canCustomerMemory) {
@@ -433,6 +448,51 @@ export function OwnerDashboardPage({
     } catch (error) {
       setSettingsError(error.message || "تعذر تحميل إعدادات المتجر.");
       setSettings(null);
+    }
+  }
+
+  async function loadInstagramConnection() {
+    if (!storeId) return;
+    setIgConnectionLoading(true);
+    setIgConnectError("");
+    try {
+      const res = await authFetch(
+        `/api/stores/${encodeURIComponent(storeId)}/channels/instagram`
+      );
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 403 && body.code === "PLAN_REQUIRED") {
+        setIgConnection(null);
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(body.message || `تعذّر تحميل الربط (${res.status})`);
+      }
+      setIgConnection(body.data ?? null);
+    } catch (error) {
+      setIgConnectError(error.message || "تعذّر تحميل حالة ربط إنستغرام.");
+      setIgConnection(null);
+    } finally {
+      setIgConnectionLoading(false);
+    }
+  }
+
+  async function connectInstagram() {
+    setIgConnectStarting(true);
+    setIgConnectError("");
+    try {
+      const res = await authFetch("/api/auth/facebook/init", { method: "POST" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.message || `تعذّر بدء الربط (${res.status})`);
+      }
+      const url = body.data?.authorize_url;
+      if (!url) {
+        throw new Error("لم يُرجع السيرفر رابط تسجيل الدخول.");
+      }
+      window.location.href = url;
+    } catch (error) {
+      setIgConnectError(error.message || "تعذّر بدء ربط إنستغرام.");
+      setIgConnectStarting(false);
     }
   }
 
@@ -1535,6 +1595,52 @@ export function OwnerDashboardPage({
 
       {showSettings && (
       <section className="owner-dashboard__grid">
+        <article
+          className="owner-dashboard__card owner-dashboard__card--full owner-dashboard__ig-connect"
+          id="instagram-connect"
+        >
+          <h2>ربط إنستغرام</h2>
+          <p className="owner-dashboard__ig-connect-lead">
+            اربط صفحة فيسبوك وحساب Instagram Business لاستقبال DM والرد عبر ShopIQ — بدون إدخال
+            Tokens يدويًا.
+          </p>
+          {igConnectError ? (
+            <p className="owner-dashboard__error" role="alert">
+              {igConnectError}
+            </p>
+          ) : null}
+          {igConnectionLoading ? (
+            <p className="owner-dashboard__muted">جاري التحقق من حالة الربط…</p>
+          ) : igConnection?.connected && igConnection.connection ? (
+            <div className="owner-dashboard__ig-connected">
+              <p className="owner-dashboard__success">
+                ✓ متصل: {igConnection.connection.page_name || "Instagram Page"}
+              </p>
+              <p className="owner-dashboard__muted" dir="ltr">
+                Page ID: {igConnection.connection.platform_page_id} · IG ID:{" "}
+                {igConnection.connection.platform_instagram_id}
+              </p>
+              <button
+                type="button"
+                className="dm-btn dm-btn--secondary"
+                disabled={igConnectStarting}
+                onClick={() => void connectInstagram()}
+              >
+                {igConnectStarting ? "جاري التحويل…" : "إعادة الربط / Connect Instagram"}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="dm-btn dm-btn--primary owner-dashboard__ig-connect-btn"
+              disabled={igConnectStarting}
+              onClick={() => void connectInstagram()}
+            >
+              {igConnectStarting ? "جاري التحويل إلى فيسبوك…" : "ربط صفحة إنستغرام | Connect Instagram"}
+            </button>
+          )}
+        </article>
+
         <article className="owner-dashboard__card owner-dashboard__card--full" id="store-settings">
           <h2>إعدادات المتجر</h2>
           {settingsError && <p className="owner-dashboard__error">{settingsError}</p>}

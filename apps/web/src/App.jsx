@@ -38,6 +38,58 @@ function App() {
   const [billingRefresh, setBillingRefresh] = useState(0);
   const [postLoginView, setPostLoginView] = useState(() => computeInitialPostLoginView());
   const [orderSearch, setOrderSearch] = useState("");
+  const [oauthToast, setOauthToast] = useState(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const instagram = params.get("instagram");
+    if (!instagram) return;
+
+    if (instagram === "connected") {
+      setOauthToast({
+        type: "success",
+        message: "تم ربط إنستغرام بنجاح — محادثات DM جاهزة الآن.",
+      });
+      if (getStoredAuth()) {
+        setView("settings");
+        replaceOwnerUrlParam("settings");
+      }
+    } else if (instagram === "error") {
+      const reason = params.get("reason") || "unknown";
+      const reasonMessages = {
+        no_ig_account:
+          "لم نجد صفحة فيسبوك مربوطة بحساب Instagram Business. اربط IG Professional بصفحتك ثم أعد المحاولة.",
+        oauth_denied: "ألغيت تسجيل الدخول إلى فيسبوك — لم يتم الربط.",
+        invalid_state: "انتهت صلاحية جلسة الربط — أعد المحاولة من زر «ربط إنستغرام».",
+        encryption_not_configured:
+          "السيرفر غير مهيأ لتشفير التوكن — تواصل مع الدعم.",
+        missing_code: "لم يصل رمز التفويض من فيسبوك.",
+        token_exchange_failed: "تعذّر استبدال رمز فيسبوك بتوكن — أعد المحاولة.",
+        server_error: "حدث خطأ أثناء الربط — أعد المحاولة.",
+      };
+      setOauthToast({
+        type: "error",
+        message:
+          reasonMessages[reason] ||
+          "تعذّر ربط إنستغرام. تحقق من صلاحيات التطبيق وحاول مجددًا.",
+      });
+      if (getStoredAuth()) {
+        setView("settings");
+        replaceOwnerUrlParam("settings");
+      }
+    }
+
+    params.delete("instagram");
+    params.delete("reason");
+    const qs = params.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
+  }, []);
+
+  useEffect(() => {
+    if (!oauthToast) return undefined;
+    const timer = window.setTimeout(() => setOauthToast(null), 9000);
+    return () => window.clearTimeout(timer);
+  }, [oauthToast]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -389,6 +441,26 @@ function App() {
           billingBanner={billingBannerEl}
           billingToolbar={billingToolbar}
         >
+          {oauthToast ? (
+            <div
+              className={
+                oauthToast.type === "success"
+                  ? "app-oauth-toast app-oauth-toast--success"
+                  : "app-oauth-toast app-oauth-toast--error"
+              }
+              role="status"
+            >
+              <span>{oauthToast.message}</span>
+              <button
+                type="button"
+                className="app-oauth-toast__close"
+                aria-label="إغلاق"
+                onClick={() => setOauthToast(null)}
+              >
+                ×
+              </button>
+            </div>
+          ) : null}
           {renderOwnerMain()}
         </OwnerShell>
       ) : (

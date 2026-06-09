@@ -1365,6 +1365,24 @@
   color: #15803d;
 }
 
+.owner-dashboard__ig-connect-lead {
+  margin: 0 0 var(--dm-space-3);
+  color: var(--dm-color-text-muted, #5b5f6a);
+  line-height: 1.6;
+  max-width: 62ch;
+}
+
+.owner-dashboard__ig-connected {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--dm-space-2);
+}
+
+.owner-dashboard__ig-connect-btn {
+  min-width: min(100%, 320px);
+}
+
 .owner-dashboard__notice {
   position: sticky;
   bottom: var(--dm-space-3);

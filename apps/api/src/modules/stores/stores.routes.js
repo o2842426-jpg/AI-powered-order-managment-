@@ -32,6 +32,7 @@ const {
 const {
   listChannelConversations,
   getChannelConversationDetail,
+  getInstagramChannelConnection,
   setChannelConversationTakeover,
   postChannelOwnerMessage,
 } = require("../channels/channel.conversations.controller");
@@ -62,6 +63,11 @@ storesRouter.post(
   postOwnerChatMessage
 );
 
+storesRouter.get(
+  "/:storeId/channels/instagram",
+  requirePlanFeature("conversations_dashboard"),
+  getInstagramChannelConnection
+);
 storesRouter.get(
   "/:storeId/channel-conversations",
   requirePlanFeature("conversations_dashboard"),
