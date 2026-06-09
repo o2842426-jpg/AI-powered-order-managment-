@@ -7,16 +7,18 @@ const {
   isChannelMessageRecorded,
   persistInboundDmEvent,
 } = require("../channels/channel.repository");
+const { processChannelAiReply } = require("../channels/channel.ai.service");
 
 /**
- * POST: signature verified — parse, dedupe, audit webhook_events, persist channel_*.
- * AI / outbound replies come in phase 4B.
+ * POST: signature verified — parse, dedupe, audit webhook_events, persist channel_*,
+ * then trigger AI reply asynchronously (phase 4B).
  *
  * @param {object} payload — parsed Meta webhook JSON
  * @returns {{
  *   received: number,
  *   recorded: number,
  *   channel_recorded: number,
+ *   ai_triggered: number,
  *   skipped_duplicate: number,
  *   skipped_no_text: number,
  *   skipped_no_connection: number
@@ -28,6 +30,7 @@ function processInstagramWebhookPayload(payload) {
     received: events.length,
     recorded: 0,
     channel_recorded: 0,
+    ai_triggered: 0,
     skipped_duplicate: 0,
     skipped_no_text: 0,
     skipped_no_connection: 0,
@@ -58,6 +61,22 @@ function processInstagramWebhookPayload(payload) {
 
       if (channelResult.ok) {
         stats.channel_recorded += 1;
+        stats.ai_triggered += 1;
+
+        setImmediate(() => {
+          processChannelAiReply({
+            storeId: channelResult.storeId,
+            conversationId: channelResult.conversationId,
+            connectionId: channelResult.connectionId,
+            customerIgsid: event.senderIgsid,
+            inboundText: event.text,
+          }).catch((err) => {
+            console.error(
+              `[channel-ai] unhandled conversation=${channelResult.conversationId}:`,
+              err?.message || err
+            );
+          });
+        });
       } else if (channelResult.reason === "no_connection") {
         stats.skipped_no_connection += 1;
       }
