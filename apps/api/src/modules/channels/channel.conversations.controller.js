@@ -7,6 +7,7 @@ const {
   getActiveConnectionById,
   insertOutboundChannelMessage,
   listChannelMessagesForStore,
+  getInstagramConnectionForStore,
 } = require("./channel.repository");
 
 /**
@@ -132,6 +133,38 @@ function getChannelConversationDetail(req, res) {
   } catch (error) {
     return res.status(500).json({
       message: "Could not load channel conversation.",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * GET /api/stores/:storeId/channels/instagram
+ */
+function getInstagramChannelConnection(req, res) {
+  try {
+    const storeId = Number(req.params.storeId);
+    if (!assertStoreScope(req, res, storeId)) return;
+
+    const connection = getInstagramConnectionForStore(storeId);
+    if (!connection) {
+      return res.status(200).json({
+        data: {
+          connected: false,
+          connection: null,
+        },
+      });
+    }
+
+    return res.status(200).json({
+      data: {
+        connected: true,
+        connection,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Could not load Instagram channel connection.",
       error: error.message,
     });
   }
@@ -316,6 +349,7 @@ async function postChannelOwnerMessage(req, res) {
 module.exports = {
   listChannelConversations,
   getChannelConversationDetail,
+  getInstagramChannelConnection,
   setChannelConversationTakeover,
   postChannelOwnerMessage,
 };

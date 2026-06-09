@@ -473,6 +473,133 @@ function updateChannelConversationTakeover({
   return result.changes > 0;
 }
 
+/**
+ * Public connection summary for owner dashboard (no token fields).
+ *
+ * @param {number} storeId
+ * @returns {object | null}
+ */
+function getInstagramConnectionForStore(storeId) {
+  return (
+    db
+      .prepare(
+        `
+          SELECT
+            id,
+            store_id,
+            platform,
+            platform_page_id,
+            platform_instagram_id,
+            page_name,
+            token_expires_at,
+            webhook_subscribed,
+            status,
+            connected_at,
+            updated_at
+          FROM channel_connections
+          WHERE store_id = ? AND platform = ? AND status = 'active'
+          LIMIT 1
+        `
+      )
+      .get(storeId, PLATFORM) || null
+  );
+}
+
+/**
+ * @param {{
+ *   storeId: number,
+ *   platformPageId: string,
+ *   platformInstagramId: string,
+ *   pageName: string,
+ *   accessTokenEnc: string,
+ *   tokenExpiresAt?: string | null,
+ *   webhookSubscribed?: number,
+ *   metadata?: object | null
+ * }} input
+ * @returns {{ id: number, created: boolean }}
+ */
+function upsertInstagramChannelConnection({
+  storeId,
+  platformPageId,
+  platformInstagramId,
+  pageName,
+  accessTokenEnc,
+  tokenExpiresAt = null,
+  webhookSubscribed = 1,
+  metadata = null,
+}) {
+  const existing = db
+    .prepare(
+      `
+        SELECT id
+        FROM channel_connections
+        WHERE store_id = ? AND platform = ?
+      `
+    )
+    .get(storeId, PLATFORM);
+
+  if (existing) {
+    db.prepare(
+      `
+        UPDATE channel_connections
+        SET
+          platform_page_id = ?,
+          platform_instagram_id = ?,
+          page_name = ?,
+          access_token_enc = ?,
+          token_expires_at = ?,
+          webhook_subscribed = ?,
+          status = 'active',
+          metadata = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `
+    ).run(
+      platformPageId,
+      platformInstagramId,
+      pageName,
+      accessTokenEnc,
+      tokenExpiresAt,
+      webhookSubscribed ? 1 : 0,
+      metadata ? JSON.stringify(metadata) : null,
+      existing.id
+    );
+    return { id: existing.id, created: false };
+  }
+
+  const result = db
+    .prepare(
+      `
+        INSERT INTO channel_connections (
+          store_id,
+          platform,
+          platform_page_id,
+          platform_instagram_id,
+          page_name,
+          access_token_enc,
+          token_expires_at,
+          webhook_subscribed,
+          status,
+          metadata
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+      `
+    )
+    .run(
+      storeId,
+      PLATFORM,
+      platformPageId,
+      platformInstagramId,
+      pageName,
+      accessTokenEnc,
+      tokenExpiresAt,
+      webhookSubscribed ? 1 : 0,
+      metadata ? JSON.stringify(metadata) : null
+    );
+
+  return { id: Number(result.lastInsertRowid), created: true };
+}
+
 module.exports = {
   PLATFORM,
   metaTimestampToIso,
@@ -488,4 +615,6 @@ module.exports = {
   getChannelConversationForStore,
   updateChannelConversationTakeover,
   listChannelMessagesForStore,
+  getInstagramConnectionForStore,
+  upsertInstagramChannelConnection,
 };
