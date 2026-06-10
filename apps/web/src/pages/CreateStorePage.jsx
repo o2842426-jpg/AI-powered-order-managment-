@@ -64,6 +64,10 @@ export function CreateStorePage({ onDone, onBackToLogin }) {
         rememberPublicStoreSlug(createdSlug);
       }
 
+      if (!body?.data?.token || !body?.data?.user?.id) {
+        throw new Error("استجابة السيرفر ناقصة — لم يصل التوكن أو بيانات المستخدم.");
+      }
+
       storeAuth(body.data);
       onDone?.(body.data);
     } catch (err) {

@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import { OwnerShell } from "./components/OwnerShell";
-import { authFetch, clearAuth, getStoredAuth, storeAuth } from "./lib/auth";
+import {
+  authFetch,
+  clearAuth,
+  getStoredAuth,
+  refreshStoredAuth,
+  storeAuth,
+} from "./lib/auth";
 import { rememberPublicStoreSlug } from "./lib/publicStoreSlug";
 import {
   OWNER_APP_VIEWS,
@@ -51,6 +57,9 @@ function App() {
         message: "تم ربط إنستغرام بنجاح — محادثات DM جاهزة الآن.",
       });
       if (getStoredAuth()) {
+        void refreshStoredAuth().then((auth) => {
+          if (auth) setOwnerAuth(auth);
+        });
         setView("settings");
         replaceOwnerUrlParam("settings");
       }

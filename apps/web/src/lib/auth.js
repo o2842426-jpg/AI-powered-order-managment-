@@ -23,7 +23,21 @@ export function getOwnerStoreIdFromAuth() {
 }
 
 export function storeAuth(auth) {
+  if (!auth?.token || !auth?.user?.id) {
+    return false;
+  }
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+  return true;
+}
+
+export async function refreshStoredAuth() {
+  const res = await authFetch("/api/auth/me");
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body?.data?.token || !body?.data?.user?.id) {
+    return null;
+  }
+  storeAuth(body.data);
+  return body.data;
 }
 
 export function clearAuth() {

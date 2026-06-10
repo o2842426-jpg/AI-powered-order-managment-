@@ -57,6 +57,10 @@ export function OwnerLoginPage({ onAuthenticated, onGoCreateStore }) {
         throw new Error(body.message || `تعذر تسجيل الدخول (${res.status})`);
       }
 
+      if (!body?.data?.token || !body?.data?.user?.id) {
+        throw new Error("استجابة السيرفر ناقصة — لم يصل التوكن أو بيانات المستخدم.");
+      }
+
       storeAuth(body.data);
       onAuthenticated(body.data);
     } catch (err) {

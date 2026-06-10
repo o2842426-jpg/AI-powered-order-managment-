@@ -17,7 +17,8 @@ app.post(
 
 app.use("/api/webhooks/instagram", instagramWebhookRouter);
 
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 app.use("/api", apiRouter);

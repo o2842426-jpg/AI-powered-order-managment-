@@ -40,29 +40,54 @@ function verifyPassword(password, storedHash) {
   );
 }
 
+function loadUserById(userId) {
+  return (
+    db
+      .prepare(
+        `
+          SELECT id, store_id, name, email, role
+          FROM users
+          WHERE id = ?
+        `
+      )
+      .get(Number(userId)) || null
+  );
+}
+
 function createAuthResponse(user) {
+  if (!user?.id) {
+    throw new Error("Cannot create auth response without a valid user.");
+  }
+
   const storeRow = db
     .prepare("SELECT slug FROM stores WHERE id = ?")
     .get(user.store_id);
   const store_slug = storeRow?.slug ? String(storeRow.slug) : null;
 
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const userRecord = {
+    id: Number(user.id),
+    store_id: Number(user.store_id),
+    name: String(user.name || ""),
+    email: String(user.email || ""),
+    role: String(user.role || "owner"),
+    store_slug,
+  };
+
   const payload = {
-    sub: user.id,
-    store_id: user.store_id,
-    role: user.role,
-    exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS,
+    sub: userRecord.id,
+    store_id: userRecord.store_id,
+    role: userRecord.role,
+    name: userRecord.name,
+    email: userRecord.email,
+    store_slug: userRecord.store_slug,
+    iat: issuedAt,
+    exp: issuedAt + TOKEN_TTL_SECONDS,
   };
 
   return {
     token: signPayload(payload),
-    user: {
-      id: user.id,
-      store_id: user.store_id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      store_slug,
-    },
+    user: userRecord,
   };
 }
 
@@ -114,9 +139,10 @@ function register(req, res) {
         hashPassword(String(password))
       );
 
-    const user = db
-      .prepare("SELECT id, store_id, name, email, role FROM users WHERE id = ?")
-      .get(result.lastInsertRowid);
+    const user = loadUserById(result.lastInsertRowid);
+    if (!user) {
+      return res.status(500).json({ message: "User created but lookup failed." });
+    }
 
     return res.status(201).json({ data: createAuthResponse(user) });
   } catch (error) {
@@ -278,19 +304,15 @@ function createStoreWithOwner(req, res) {
 
     runTx();
 
-    const user = db
-      .prepare(
-        "SELECT id, store_id, name, email, role FROM users WHERE id = ?"
-      )
-      .get(newUserId);
-
+    const user = loadUserById(newUserId);
     if (!user) {
       return res.status(500).json({ message: "Store created but user lookup failed." });
     }
 
+    const auth = createAuthResponse(user);
     return res.status(201).json({
       data: {
-        ...createAuthResponse(user),
+        ...auth,
         store: {
           id: user.store_id,
           slug,
@@ -331,10 +353,34 @@ function login(req, res) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    return res.status(200).json({ data: createAuthResponse(user) });
+    const freshUser = loadUserById(user.id);
+    if (!freshUser) {
+      return res.status(500).json({ message: "User lookup failed after login." });
+    }
+
+    return res.status(200).json({ data: createAuthResponse(freshUser) });
   } catch (error) {
     return res.status(500).json({
       message: "Could not login.",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * GET /api/auth/me — return a fresh token + user record for the current session.
+ */
+function getCurrentAuthSession(req, res) {
+  try {
+    const freshUser = loadUserById(req.user?.id);
+    if (!freshUser) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    return res.status(200).json({ data: createAuthResponse(freshUser) });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Could not refresh auth session.",
       error: error.message,
     });
   }
@@ -344,5 +390,6 @@ module.exports = {
   register,
   login,
   createStoreWithOwner,
+  getCurrentAuthSession,
   getAuthSecret,
 };
