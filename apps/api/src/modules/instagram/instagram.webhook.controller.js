@@ -63,9 +63,7 @@ function handleInstagramWebhookPost(req, res) {
 
   try {
     const stats = processInstagramWebhookPayload(payload);
-    if (stats.recorded > 0 || stats.skipped_duplicate > 0) {
-      console.info("[instagram-webhook] batch stats", stats);
-    }
+    console.info("[instagram-webhook] POST accepted", stats);
   } catch (err) {
     console.error("[instagram-webhook] processing error:", err?.message || err);
   }
