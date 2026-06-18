@@ -831,6 +831,11 @@
 
 .owner-dashboard__low-stock-head button {
   flex: 0 0 auto;
+  width: auto;
+  align-self: flex-start;
+  white-space: nowrap;
+  padding: 0.5rem 1rem;
+  min-height: 40px;
 }
 
 .owner-dashboard__low-stock-empty {
@@ -892,6 +897,7 @@
 .owner-dashboard__low-stock-product strong {
   display: block;
   font-size: 0.95rem;
+  color: var(--dm-color-text, #111827);
 }
 
 .owner-dashboard__low-stock-product small {
@@ -1228,6 +1234,7 @@
   border-radius: var(--dm-radius-lg);
   background: var(--dm-color-bg);
   border: 1px solid var(--dm-color-border);
+  color: var(--dm-color-text, #111827);
 }
 
 .owner-dashboard__variant-card.is-low {
@@ -1262,6 +1269,8 @@
   display: block;
   margin-top: 6px;
   font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--dm-color-text, #111827);
 }
 
 .owner-dashboard__variant-head em {
@@ -1293,6 +1302,44 @@
 
 .owner-dashboard__variant-fields label {
   margin-bottom: 0;
+  color: #374151;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.owner-dashboard__variant-card input {
+  background: #fff;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.owner-dashboard__ig-meta-setup {
+  margin: 0 0 var(--dm-space-3);
+  padding: var(--dm-space-3);
+  border-radius: var(--dm-radius-md);
+  border: 1px solid rgba(109, 94, 249, 0.2);
+  background: rgba(109, 94, 249, 0.05);
+  color: var(--dm-color-text-muted, #5b5f6a);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+.owner-dashboard__ig-meta-setup summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--dm-color-primary);
+}
+
+.owner-dashboard__ig-meta-setup ol {
+  margin: var(--dm-space-2) 0 0;
+  padding-inline-start: 1.2rem;
+}
+
+.owner-dashboard__ig-meta-setup code {
+  font-size: 0.8em;
+  background: rgba(15, 23, 42, 0.06);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
 }
 
 .owner-dashboard__variant-card > button {
@@ -1419,6 +1466,16 @@
 @media (max-width: 640px) {
   .owner-dashboard__summary {
     grid-template-columns: 1fr;
+  }
+
+  .owner-dashboard__low-stock-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .owner-dashboard__low-stock-head button {
+    align-self: flex-start;
+    width: auto;
   }
 
   .owner-dashboard__hero-cta {

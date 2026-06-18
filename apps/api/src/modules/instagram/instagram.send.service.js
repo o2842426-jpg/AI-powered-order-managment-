@@ -1,4 +1,8 @@
-const { decryptChannelToken } = require("../channels/channelTokenCrypto");
+const {
+  resolveConnectionAccessToken,
+  describeAccessToken,
+  detectWrongInstagramLoginToken,
+} = require("../channels/channelTokenResolve");
 
 const DEFAULT_GRAPH_VERSION = "v21.0";
 
@@ -8,7 +12,7 @@ function resolveGraphApiVersion() {
 
 /**
  * @param {{
- *   instagramBusinessId: string,
+ *   pageId: string,
  *   recipientIgsid: string,
  *   text: string,
  *   accessToken: string
@@ -16,7 +20,7 @@ function resolveGraphApiVersion() {
  * @returns {Promise<{ ok: true, messageId: string } | { ok: false, error: string, status?: number }>}
  */
 async function sendInstagramTextMessage({
-  instagramBusinessId,
+  pageId,
   recipientIgsid,
   text,
   accessToken,
@@ -25,17 +29,44 @@ async function sendInstagramTextMessage({
   if (!body) {
     return { ok: false, error: "empty_text" };
   }
+  const normalizedPageId = String(pageId || "").trim();
+  const normalizedRecipientIgsid = String(recipientIgsid || "").trim();
+  const normalizedAccessToken = String(accessToken || "").trim();
+
+  if (!normalizedRecipientIgsid) {
+    return { ok: false, error: "missing_recipient_igsid" };
+  }
+  if (!normalizedAccessToken) {
+    return { ok: false, error: "missing_access_token" };
+  }
+
+  const wrongTokenType = detectWrongInstagramLoginToken(normalizedAccessToken);
+  if (wrongTokenType) {
+    return { ok: false, error: wrongTokenType };
+  }
 
   const version = resolveGraphApiVersion();
-  const url = `https://graph.facebook.com/${version}/${instagramBusinessId}/messages`;
+  const tokenInfo = describeAccessToken(normalizedAccessToken);
+  if (!tokenInfo.looksValid) {
+    return {
+      ok: false,
+      error: `invalid_page_access_token_shape len=${tokenInfo.length} prefix=${tokenInfo.prefix}`,
+    };
+  }
+
+  // Meta docs: Page access token + /me/messages avoids page-id path mismatches.
+  const url = `https://graph.facebook.com/${version}/me/messages`;
 
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${normalizedAccessToken}`,
+    },
     body: JSON.stringify({
-      recipient: { id: String(recipientIgsid) },
+      messaging_product: "instagram",
+      recipient: { id: normalizedRecipientIgsid },
       message: { text: body },
-      access_token: accessToken,
     }),
   });
 
@@ -46,6 +77,18 @@ async function sendInstagramTextMessage({
       data?.error?.message ||
       data?.error?.error_user_msg ||
       `graph_http_${res.status}`;
+    console.warn("[instagram-send] graph error", {
+      pageId: normalizedPageId || null,
+      recipientIgsid: normalizedRecipientIgsid,
+      token: tokenInfo,
+      graph: {
+        message: data?.error?.message || null,
+        type: data?.error?.type || null,
+        code: data?.error?.code ?? null,
+        error_subcode: data?.error?.error_subcode ?? null,
+        fbtrace_id: data?.error?.fbtrace_id || null,
+      },
+    });
     return { ok: false, error: String(err), status: res.status };
   }
 
@@ -74,16 +117,16 @@ async function sendInstagramTextWithEncryptedToken({
 }) {
   let accessToken;
   try {
-    accessToken = decryptChannelToken(connection.access_token_enc);
+    accessToken = resolveConnectionAccessToken(connection.access_token_enc);
   } catch (err) {
     return {
       ok: false,
-      error: `token_decrypt_failed: ${err?.message || err}`,
+      error: `token_resolve_failed: ${err?.message || err}`,
     };
   }
 
   return sendInstagramTextMessage({
-    instagramBusinessId: connection.platform_instagram_id,
+    pageId: connection.platform_page_id,
     recipientIgsid,
     text,
     accessToken,

@@ -6,9 +6,14 @@
  *     --store-id=1 --page-id=PAGE_ID --ig-id=IG_BUSINESS_ID --token=PAGE_ACCESS_TOKEN
  */
 require("dotenv").config({ path: require("path").join(__dirname, "..", "..", "..", ".env") });
+require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
 
 const { db } = require("../src/db/client");
-const { encryptChannelToken } = require("../src/modules/channels/channelTokenCrypto");
+const {
+  encryptChannelToken,
+  decryptChannelToken,
+} = require("../src/modules/channels/channelTokenCrypto");
+const { normalizeMetaAccessToken } = require("../src/modules/channels/channelTokenResolve");
 
 function readArg(name) {
   const prefix = `--${name}=`;
@@ -19,7 +24,7 @@ function readArg(name) {
 const storeId = Number(readArg("store-id"));
 const pageId = readArg("page-id");
 const igId = readArg("ig-id");
-const token = readArg("token");
+const token = normalizeMetaAccessToken(readArg("token"));
 const pageName = readArg("page-name") || "Instagram test";
 
 if (!Number.isFinite(storeId) || storeId <= 0) {
@@ -30,6 +35,33 @@ if (!pageId || !igId || !token) {
   console.error("Required: --page-id, --ig-id, --token");
   process.exit(1);
 }
+if (!token.startsWith("EAA")) {
+  console.error("Token does not look like a Meta Page access token (expected prefix EAA).");
+  process.exit(1);
+}
+if (token.startsWith("IGAA")) {
+  console.error("Instagram Login tokens (IGAA...) cannot send DMs. Use a Page access token (EAA...).");
+  process.exit(1);
+}
+
+const encryptionKey = String(process.env.CHANNEL_TOKEN_ENCRYPTION_KEY || "").trim();
+if (!encryptionKey) {
+  console.error("CHANNEL_TOKEN_ENCRYPTION_KEY is missing. Load .env before running this script.");
+  process.exit(1);
+}
+if (/paste-real-key-from-env/i.test(encryptionKey)) {
+  console.error("CHANNEL_TOKEN_ENCRYPTION_KEY is still a placeholder. Use the real key from .env.");
+  process.exit(1);
+}
+
+console.log("Seed input:", {
+  storeId,
+  pageId,
+  igId,
+  tokenPrefix: token.slice(0, 6),
+  tokenLength: token.length,
+  encryptionKeyLength: encryptionKey.length,
+});
 
 const store = db.prepare("SELECT id FROM stores WHERE id = ?").get(storeId);
 if (!store) {
@@ -38,6 +70,11 @@ if (!store) {
 }
 
 const accessTokenEnc = encryptChannelToken(token);
+const roundtrip = decryptChannelToken(accessTokenEnc).trim();
+if (roundtrip !== token) {
+  console.error("Encrypt/decrypt roundtrip failed in this process. Aborting before DB write.");
+  process.exit(1);
+}
 
 const existing = db
   .prepare(
@@ -91,3 +128,32 @@ if (existing) {
 }
 
 console.log("Recipient lookup ids:", { pageId, igId });
+
+const saved = db
+  .prepare(
+    `
+      SELECT
+        id,
+        substr(access_token_enc, 1, 16) AS enc_prefix,
+        length(access_token_enc) AS enc_len
+      FROM channel_connections
+      WHERE store_id = ? AND platform = 'instagram'
+    `
+  )
+  .get(storeId);
+
+const savedToken = decryptChannelToken(
+  db
+    .prepare(
+      "SELECT access_token_enc FROM channel_connections WHERE store_id = ? AND platform = 'instagram'"
+    )
+    .get(storeId).access_token_enc
+).trim();
+
+console.log("Saved connection:", saved);
+console.log("Saved token check:", {
+  prefix: savedToken.slice(0, 6),
+  length: savedToken.length,
+  startsWithEAA: savedToken.startsWith("EAA"),
+  matchesInput: savedToken === token,
+});

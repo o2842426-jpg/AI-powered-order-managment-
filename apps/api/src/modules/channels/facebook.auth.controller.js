@@ -11,6 +11,7 @@ const {
   fetchPagesWithInstagram,
   selectPageWithInstagram,
   resolveFrontendSettingsUrl,
+  resolveOAuthRedirectUri,
 } = require("./facebook.oauth.service");
 const { upsertInstagramChannelConnection } = require("./channel.repository");
 
@@ -42,6 +43,7 @@ function initFacebookOAuth(req, res) {
       data: {
         authorize_url: authorizeUrl,
         state_expires_in: STATE_TTL_SECONDS,
+        redirect_uri: resolveOAuthRedirectUri(),
       },
     });
   } catch (error) {

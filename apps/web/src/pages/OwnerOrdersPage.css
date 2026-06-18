@@ -109,17 +109,25 @@
 
 .owner-orders__filters {
   display: flex;
-  gap: 0.45rem;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding-bottom: 2px;
 }
 
 .owner-orders__filters button {
   flex: 0 0 auto;
-  padding: 0.45rem 0.7rem;
+  width: auto;
+  max-width: none;
+  padding: 0.38rem 0.62rem;
   border: 1px solid #e5e7eb;
   border-radius: 999px;
   background: #fff;
   color: #4b5563;
+  font-size: 0.8rem;
+  white-space: nowrap;
   cursor: pointer;
 }
 

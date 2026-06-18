@@ -266,6 +266,7 @@ export function OwnerDashboardPage({
   const [igConnectionLoading, setIgConnectionLoading] = useState(false);
   const [igConnectError, setIgConnectError] = useState("");
   const [igConnectStarting, setIgConnectStarting] = useState(false);
+  const [igOAuthRedirectUri, setIgOAuthRedirectUri] = useState("");
   const [publicLinkCopied, setPublicLinkCopied] = useState(false);
 
   const [products, setProducts] = useState([]);
@@ -488,6 +489,9 @@ export function OwnerDashboardPage({
       const url = body.data?.authorize_url;
       if (!url) {
         throw new Error("لم يُرجع السيرفر رابط تسجيل الدخول.");
+      }
+      if (body.data?.redirect_uri) {
+        setIgOAuthRedirectUri(String(body.data.redirect_uri));
       }
       window.location.href = url;
     } catch (error) {
@@ -1604,6 +1608,30 @@ export function OwnerDashboardPage({
             اربط صفحة فيسبوك وحساب Instagram Business لاستقبال DM والرد عبر ShopIQ — بدون إدخال
             Tokens يدويًا.
           </p>
+          <details className="owner-dashboard__ig-meta-setup">
+            <summary>إعداد Meta (إذا ظهر خطأ «App Domains»)</summary>
+            <ol>
+              <li>
+                Meta App → <strong>Settings → Basic → App domains</strong>: أضف{" "}
+                <code dir="ltr">shopiq.me</code>
+              </li>
+              <li>
+                Meta App → <strong>Facebook Login → Valid OAuth Redirect URIs</strong>:{" "}
+                <code dir="ltr">
+                  {igOAuthRedirectUri || "https://api.shopiq.me/api/auth/facebook/callback"}
+                </code>
+              </li>
+              <li>
+                Meta App → <strong>Website → Site URL</strong>:{" "}
+                <code dir="ltr">https://www.shopiq.me</code>
+              </li>
+              <li>
+                تأكد أن المنتجات <strong>Messenger</strong> و{" "}
+                <strong>Instagram Messaging</strong> مفعّلة، مع صلاحية{" "}
+                <code dir="ltr">instagram_manage_messages</code>.
+              </li>
+            </ol>
+          </details>
           {igConnectError ? (
             <p className="owner-dashboard__error" role="alert">
               {igConnectError}
