@@ -1445,6 +1445,7 @@
   border: 1px dashed rgba(109, 94, 249, 0.35);
   background: #f8fafc !important;
   color: #111827 !important;
+  color-scheme: light;
 }
 
 .owner-dashboard__card--optional-options h2,
@@ -1456,6 +1457,37 @@
 .owner-dashboard__card--optional-options .owner-dashboard__muted,
 .owner-dashboard__card--optional-options .owner-dashboard__muted--tight {
   color: #4b5563 !important;
+}
+
+.owner-dashboard__card--optional-options label,
+.owner-dashboard__card--optional-options .owner-dashboard__option-label {
+  display: block;
+  margin-bottom: 0;
+  color: #111827 !important;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.owner-dashboard__card--optional-options input,
+.owner-dashboard__card--optional-options textarea,
+.owner-dashboard__card--optional-options select,
+.owner-dashboard__card--optional-options .owner-dashboard__option-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: var(--owner-radius-md, 12px);
+  background: #ffffff !important;
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827;
+  font: inherit;
+}
+
+.owner-dashboard__card--optional-options input::placeholder,
+.owner-dashboard__card--optional-options textarea::placeholder {
+  color: #6b7280 !important;
+  opacity: 1;
 }
 
 .owner-dashboard__option-form {
@@ -1480,7 +1512,7 @@
 
 .owner-dashboard__option-label {
   display: block;
-  color: #1f2937 !important;
+  color: #111827 !important;
   font-size: 0.82rem;
   font-weight: 700;
   line-height: 1.45;
@@ -1490,15 +1522,17 @@
   width: 100%;
   box-sizing: border-box;
   padding: 12px 14px;
-  border: 1px solid #d1d5db !important;
+  border: 1px solid #cbd5e1 !important;
   border-radius: var(--owner-radius-md, 12px);
   background: #ffffff !important;
   color: #111827 !important;
+  -webkit-text-fill-color: #111827;
   font: inherit;
 }
 
 .owner-dashboard__option-input::placeholder {
-  color: #9ca3af !important;
+  color: #6b7280 !important;
+  opacity: 1;
 }
 
 .owner-dashboard__card--optional-options .owner-dashboard__variant-fields label {
