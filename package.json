@@ -12,6 +12,7 @@
     "build:web": "npm --workspace apps/web run build",
     "preview:web": "npm --workspace apps/web run preview",
     "deploy:web": "npm run build:web && pm2 restart shopiq-web",
+    "deploy:web:static": "bash scripts/deploy-web-static.sh",
     "deploy:api": "pm2 restart shopiq-api --update-env",
     "deploy": "npm run build:web && pm2 restart shopiq-web && pm2 restart shopiq-api --update-env",
     "docker:up": "docker compose up --build",
