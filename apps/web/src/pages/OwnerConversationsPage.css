@@ -2,6 +2,7 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: var(--dm-space-4) var(--dm-space-3) var(--dm-space-6);
+  color: var(--dm-color-text, #151515);
 }
 
 .owner-conv--empty,
@@ -60,6 +61,8 @@
   padding: 10px 14px;
   border-radius: 12px;
   border: 1px solid var(--dm-color-border, #e8e8ef);
+  background: #fff;
+  color: var(--dm-color-text, #151515);
   font: inherit;
 }
 
@@ -211,7 +214,7 @@
   background: var(--dm-color-bg, #fafafa);
   cursor: pointer;
   font: inherit;
-  color: inherit;
+  color: var(--dm-color-text, #151515);
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease;
@@ -378,6 +381,8 @@
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid var(--dm-color-border, #e8e8ef);
+  background: #fff;
+  color: var(--dm-color-text, #151515);
   font: inherit;
   resize: vertical;
   min-height: 56px;
@@ -392,6 +397,7 @@
 .owner-conv__detail-head h2 {
   margin: 0 0 6px;
   font-size: 1.15rem;
+  color: var(--dm-color-text, #151515);
 }
 
 .owner-conv__detail-sub,
@@ -447,6 +453,26 @@
   margin: 0;
   white-space: pre-wrap;
   line-height: 1.55;
+  color: var(--dm-color-text, #151515);
+}
+
+.owner-conv__bubble.is-image .owner-conv__bubble-text {
+  font-weight: 600;
+}
+
+.owner-conv__bubble-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.owner-conv__bubble-images img {
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--dm-color-border, #e8e8ef);
 }
 
 .owner-conv__bubble-lead {

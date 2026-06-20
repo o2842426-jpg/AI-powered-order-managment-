@@ -215,6 +215,7 @@
   font-size: 1.2rem;
   font-weight: 700;
   letter-spacing: 0.03em;
+  color: var(--dm-color-text, #151515);
 }
 
 .owner-dashboard__store-switcher--readonly small {
@@ -1198,6 +1199,7 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
+  color: var(--dm-color-text, #151515);
 }
 
 .owner-dashboard__product-body p {
@@ -1711,6 +1713,7 @@
   white-space: pre-wrap;
   line-height: 1.55;
   font-size: 0.9rem;
+  color: var(--dm-color-text, #151515);
 }
 
 .owner-dashboard__memory-add {

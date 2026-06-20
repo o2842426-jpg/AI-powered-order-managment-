@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { authFetch, getOwnerStoreIdFromAuth } from "../lib/auth";
+import { mediaUrl } from "../lib/api";
 import "./OwnerConversationsPage.css";
 
 function formatDt(iso) {
@@ -14,6 +15,33 @@ function formatDt(iso) {
   } catch {
     return String(iso);
   }
+}
+
+function parseMessagePayload(raw) {
+  if (!raw) return null;
+  if (typeof raw === "object") return raw;
+  try {
+    return JSON.parse(String(raw));
+  } catch {
+    return null;
+  }
+}
+
+function formatChannelMessage(message) {
+  const text = String(message?.message_text || message?.body_text || "").trim();
+  if (text) return text;
+
+  if (message?.message_type === "image") {
+    return "صور منتج مرفقة";
+  }
+
+  return "—";
+}
+
+function getMessageImageUrls(message) {
+  const payload = parseMessagePayload(message?.payload);
+  const urls = Array.isArray(payload?.image_urls) ? payload.image_urls : [];
+  return urls.map((url) => mediaUrl(url)).filter(Boolean);
 }
 
 export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
@@ -613,7 +641,12 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                 ) : null}
               </div>
               <ul className="owner-conv__thread">
-                {(detail.messages || []).map((m) => (
+                {(detail.messages || []).map((m) => {
+                  const imageUrls = getMessageImageUrls(m);
+                  const isImageMessage =
+                    m.message_type === "image" || imageUrls.length > 0;
+
+                  return (
                   <li
                     key={m.id}
                     className={
@@ -621,7 +654,9 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                         ? "owner-conv__bubble is-customer"
                         : m.sender_type === "owner"
                           ? "owner-conv__bubble is-owner"
-                          : "owner-conv__bubble is-ai"
+                          : isImageMessage
+                            ? "owner-conv__bubble is-ai is-image"
+                            : "owner-conv__bubble is-ai"
                     }
                   >
                     <span className="owner-conv__bubble-label">
@@ -631,7 +666,18 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                           ? "المالك"
                           : "المساعد"}
                     </span>
-                    <p className="owner-conv__bubble-text">{m.message_text || m.body_text}</p>
+                    <p className="owner-conv__bubble-text" dir="auto">
+                      {formatChannelMessage(m)}
+                    </p>
+                    {imageUrls.length > 0 ? (
+                      <div className="owner-conv__bubble-images">
+                        {imageUrls.map((url) => (
+                          <a key={url} href={url} target="_blank" rel="noreferrer">
+                            <img src={url} alt="صورة منتج" />
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                     {m.sender_type === "customer" && m.lead_score != null && m.lead_score !== "" ? (
                       <p className="owner-conv__bubble-lead" dir="auto">
                         تقييم الرسالة: {Number(m.lead_score)}/100
@@ -640,7 +686,8 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                     ) : null}
                     <time className="owner-conv__bubble-time">{formatDt(m.created_at)}</time>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
               <form className="owner-conv__owner-reply" onSubmit={sendOwnerReply}>
                 <label className="owner-conv__owner-reply-label">

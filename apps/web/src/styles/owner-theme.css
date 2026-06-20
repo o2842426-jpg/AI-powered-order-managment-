@@ -40,15 +40,41 @@
   font-family: inherit;
 }
 
-.owner-shell .owner-dashboard strong,
-.owner-shell .owner-dashboard .owner-dashboard__summary-body strong {
+.owner-shell .owner-dashboard__eyebrow {
+  color: var(--owner-color-primary) !important;
+}
+
+/* Light-surface islands inside the dark owner shell */
+.owner-shell .card,
+.owner-shell .owner-conv,
+.owner-shell .owner-dashboard__product-card,
+.owner-shell .owner-dashboard__low-stock-flow,
+.owner-shell .owner-dashboard__low-stock-card,
+.owner-shell .owner-dashboard__memory-item,
+.owner-shell .owner-dashboard__store-switcher,
+.owner-shell .owner-dashboard__extra-images {
+  color: var(--dm-color-text, #151515);
+}
+
+.owner-shell .card strong,
+.owner-shell .owner-conv strong,
+.owner-shell .owner-dashboard__product-card strong,
+.owner-shell .owner-dashboard__low-stock-card strong,
+.owner-shell .owner-dashboard__memory-item strong,
+.owner-shell .owner-dashboard__store-switcher strong {
+  color: var(--dm-color-text, #151515);
+}
+
+.owner-shell .owner-dashboard__hero strong,
+.owner-shell .owner-dashboard__hero-summary strong,
+.owner-shell .owner-metric-card strong,
+.owner-shell .owner-dashboard__summary-body strong {
   font-family: var(--owner-font-metric);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.04em;
   color: var(--owner-color-text);
 }
 
-.owner-shell .owner-dashboard__muted,
 .owner-shell .owner-dashboard small,
 .owner-shell .owner-dashboard__summary-body span,
 .owner-shell .owner-dashboard__summary-body small,
@@ -57,8 +83,4 @@
 .owner-shell .owner-dashboard__section-desc,
 .owner-shell .owner-dashboard__turnover-list li small {
   color: var(--owner-color-muted);
-}
-
-.owner-shell .owner-dashboard__eyebrow {
-  color: var(--owner-color-primary) !important;
 }
