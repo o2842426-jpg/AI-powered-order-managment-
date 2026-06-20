@@ -1609,35 +1609,40 @@ export function OwnerDashboardPage({
             Tokens يدويًا.
           </p>
           <details className="owner-dashboard__ig-meta-setup">
-            <summary>إعداد Meta (أخطاء الربط الشائعة)</summary>
+            <summary>إعداد Meta — خطأ «domain isn&apos;t included»</summary>
+            <p className="owner-dashboard__ig-meta-setup-lead">
+              بعد تسجيل الدخول يحوّل فيسبوك إلى هذا الرابط (يجب تسجيله في Meta بالضبط):
+            </p>
+            <code className="owner-dashboard__ig-meta-setup-uri" dir="ltr">
+              {igOAuthRedirectUri || "https://api.shopiq.me/api/auth/facebook/callback"}
+            </code>
             <ol>
               <li>
-                Meta App → <strong>Settings → Basic → App domains</strong>: أضف{" "}
-                <code dir="ltr">shopiq.me</code>
+                Meta App → <strong>Settings → Basic → App domains</strong> — أضف سطرًا لكل نطاق
+                (بدون <code dir="ltr">https://</code>):
+                <ul>
+                  <li><code dir="ltr">shopiq.me</code></li>
+                  <li><code dir="ltr">api.shopiq.me</code></li>
+                  <li><code dir="ltr">www.shopiq.me</code></li>
+                </ul>
               </li>
               <li>
-                Meta App → <strong>Facebook Login → Valid OAuth Redirect URIs</strong>:{" "}
-                <code dir="ltr">
-                  {igOAuthRedirectUri || "https://api.shopiq.me/api/auth/facebook/callback"}
-                </code>
+                Meta App → <strong>Products → Facebook Login → Settings</strong> →{" "}
+                <strong>Valid OAuth Redirect URIs</strong> — الصق نفس الرابط أعلاه حرفيًا.
               </li>
               <li>
-                Meta App → <strong>Website → Site URL</strong>:{" "}
+                فعّل <strong>Client OAuth Login</strong> و <strong>Web OAuth Login</strong> = Yes.
+              </li>
+              <li>
+                Meta App → <strong>Settings → Basic → Website</strong> → Site URL:{" "}
                 <code dir="ltr">https://www.shopiq.me</code>
               </li>
               <li>
+                احفظ التغييرات، انتظر 2–5 دقائق، ثم أعد المحاولة.
+              </li>
+              <li>
                 على الكمبيوتر: سجّل الدخول في فيسبوك بنفس الحساب المضاف كـ{" "}
-                <strong>Tester</strong> في التطبيق (قد يكون الكمبيوتر بحساب مختلف عن الجوال).
-              </li>
-              <li>
-                إذا ظهر على الجوال <strong>App not active</strong>: التطبيق في وضع Development.
-                إمّا تفعّل <strong>Live</strong> من لوحة Meta، أو أضف حساب فيسبوك/إنستغرام
-                المستخدم كـ <strong>Tester</strong> داخل App Roles.
-              </li>
-              <li>
-                تأكد أن المنتجات <strong>Messenger</strong> و{" "}
-                <strong>Instagram Messaging</strong> مفعّلة، مع صلاحية{" "}
-                <code dir="ltr">instagram_manage_messages</code>.
+                <strong>Tester</strong> في التطبيق.
               </li>
             </ol>
           </details>
