@@ -10,6 +10,10 @@
     "dev:api": "npm --workspace apps/api run dev",
     "dev:web": "npm --workspace apps/web run dev",
     "build:web": "npm --workspace apps/web run build",
+    "preview:web": "npm --workspace apps/web run preview",
+    "deploy:web": "npm run build:web && pm2 restart shopiq-web",
+    "deploy:api": "pm2 restart shopiq-api --update-env",
+    "deploy": "npm run build:web && pm2 restart shopiq-web && pm2 restart shopiq-api --update-env",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down"
   }
