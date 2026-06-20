@@ -14,21 +14,17 @@ function resolveGraphApiVersion() {
  * @param {{
  *   pageId: string,
  *   recipientIgsid: string,
- *   text: string,
- *   accessToken: string
+ *   accessToken: string,
+ *   message: object
  * }} input
  * @returns {Promise<{ ok: true, messageId: string } | { ok: false, error: string, status?: number }>}
  */
-async function sendInstagramTextMessage({
+async function sendInstagramApiMessage({
   pageId,
   recipientIgsid,
-  text,
   accessToken,
+  message,
 }) {
-  const body = String(text || "").trim();
-  if (!body) {
-    return { ok: false, error: "empty_text" };
-  }
   const normalizedPageId = String(pageId || "").trim();
   const normalizedRecipientIgsid = String(recipientIgsid || "").trim();
   const normalizedAccessToken = String(accessToken || "").trim();
@@ -38,6 +34,9 @@ async function sendInstagramTextMessage({
   }
   if (!normalizedAccessToken) {
     return { ok: false, error: "missing_access_token" };
+  }
+  if (!message || typeof message !== "object") {
+    return { ok: false, error: "missing_message" };
   }
 
   const wrongTokenType = detectWrongInstagramLoginToken(normalizedAccessToken);
@@ -54,7 +53,6 @@ async function sendInstagramTextMessage({
     };
   }
 
-  // Meta docs: Page access token + /me/messages avoids page-id path mismatches.
   const url = `https://graph.facebook.com/${version}/me/messages`;
 
   const res = await fetch(url, {
@@ -66,7 +64,7 @@ async function sendInstagramTextMessage({
     body: JSON.stringify({
       messaging_product: "instagram",
       recipient: { id: normalizedRecipientIgsid },
-      message: { text: body },
+      message,
     }),
   });
 
@@ -98,6 +96,99 @@ async function sendInstagramTextMessage({
   }
 
   return { ok: true, messageId };
+}
+
+/**
+ * @param {{
+ *   pageId: string,
+ *   recipientIgsid: string,
+ *   text: string,
+ *   accessToken: string
+ * }} input
+ * @returns {Promise<{ ok: true, messageId: string } | { ok: false, error: string, status?: number }>}
+ */
+async function sendInstagramTextMessage({
+  pageId,
+  recipientIgsid,
+  text,
+  accessToken,
+}) {
+  const body = String(text || "").trim();
+  if (!body) {
+    return { ok: false, error: "empty_text" };
+  }
+
+  return sendInstagramApiMessage({
+    pageId,
+    recipientIgsid,
+    accessToken,
+    message: { text: body },
+  });
+}
+
+/**
+ * @param {{
+ *   pageId: string,
+ *   recipientIgsid: string,
+ *   imageUrls: string[],
+ *   accessToken: string
+ * }} input
+ * @returns {Promise<{ ok: true, messageId: string } | { ok: false, error: string, status?: number }>}
+ */
+async function sendInstagramImagesMessage({
+  pageId,
+  recipientIgsid,
+  imageUrls,
+  accessToken,
+}) {
+  const urls = (imageUrls || [])
+    .map((url) => String(url || "").trim())
+    .filter((url) => /^https:\/\//i.test(url));
+
+  if (!urls.length) {
+    return { ok: false, error: "no_images" };
+  }
+
+  if (urls.length > 1) {
+    const batchResult = await sendInstagramApiMessage({
+      pageId,
+      recipientIgsid,
+      accessToken,
+      message: {
+        attachments: urls.map((url) => ({
+          type: "image",
+          payload: { url, is_reusable: true },
+        })),
+      },
+    });
+    if (batchResult.ok) {
+      return batchResult;
+    }
+    console.warn(
+      `[instagram-send] batch image send failed (${batchResult.error}), retrying one-by-one`
+    );
+  }
+
+  let lastMessageId = "";
+  for (const url of urls) {
+    const result = await sendInstagramApiMessage({
+      pageId,
+      recipientIgsid,
+      accessToken,
+      message: {
+        attachment: {
+          type: "image",
+          payload: { url, is_reusable: true },
+        },
+      },
+    });
+    if (!result.ok) {
+      return result;
+    }
+    lastMessageId = result.messageId;
+  }
+
+  return { ok: true, messageId: lastMessageId };
 }
 
 /**
@@ -133,7 +224,41 @@ async function sendInstagramTextWithEncryptedToken({
   });
 }
 
+/**
+ * @param {{
+ *   connection: { platform_page_id: string, access_token_enc: string },
+ *   recipientIgsid: string,
+ *   imageUrls: string[]
+ * }} input
+ * @returns {Promise<{ ok: true, messageId: string } | { ok: false, error: string, status?: number }>}
+ */
+async function sendInstagramImagesWithEncryptedToken({
+  connection,
+  recipientIgsid,
+  imageUrls,
+}) {
+  let accessToken;
+  try {
+    accessToken = resolveConnectionAccessToken(connection.access_token_enc);
+  } catch (err) {
+    return {
+      ok: false,
+      error: `token_resolve_failed: ${err?.message || err}`,
+    };
+  }
+
+  return sendInstagramImagesMessage({
+    pageId: connection.platform_page_id,
+    recipientIgsid,
+    imageUrls,
+    accessToken,
+  });
+}
+
 module.exports = {
+  sendInstagramApiMessage,
   sendInstagramTextMessage,
+  sendInstagramImagesMessage,
   sendInstagramTextWithEncryptedToken,
+  sendInstagramImagesWithEncryptedToken,
 };

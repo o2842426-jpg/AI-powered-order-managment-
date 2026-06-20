@@ -313,7 +313,8 @@ function listChannelMessagesForAi(conversationId, limit = 8) {
  *   senderType?: string,
  *   deliveryStatus?: string,
  *   payload?: object | null,
- *   sentAt?: string | null
+ *   sentAt?: string | null,
+ *   messageType?: string
  * }} input
  */
 function insertOutboundChannelMessage({
@@ -325,8 +326,10 @@ function insertOutboundChannelMessage({
   deliveryStatus = "sent",
   payload = null,
   sentAt = null,
+  messageType = "text",
 }) {
   const at = sentAt || new Date().toISOString();
+  const normalizedType = String(messageType || "text").trim() || "text";
 
   db.prepare(
     `
@@ -343,7 +346,7 @@ function insertOutboundChannelMessage({
         delivery_status,
         sent_at
       )
-      VALUES (?, ?, ?, 'outbound', ?, ?, 'text', ?, ?, ?, ?)
+      VALUES (?, ?, ?, 'outbound', ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     conversationId,
@@ -351,6 +354,7 @@ function insertOutboundChannelMessage({
     PLATFORM,
     senderType,
     mid,
+    normalizedType,
     text,
     payload ? JSON.stringify(payload) : null,
     deliveryStatus,

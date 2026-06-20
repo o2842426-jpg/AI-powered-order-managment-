@@ -90,6 +90,18 @@ function buildConversationMessages(conversationMessages, messageText) {
   }));
 }
 
+function buildChannelContextBlock(channelContext) {
+  if (channelContext === "instagram_dm") {
+    return `
+قناة المحادثة: Instagram DM (داخل التطبيق فقط).
+- لا تطلب من العميل زيارة الموقع أو متجر ويب ولا ترسل روابط خارجية.
+- عند طلب صور/صورة/شكل المنتج أو عند اقتراح منتجات للعرض، ضع معرفاتها في recommended_product_ids — النظام يرسل الصور تلقائيًا في المحادثة.
+- لا تقل أن الصورة «في الرابط» أو «على الموقع»؛ قل أن الصور ستظهر في المحادثة أو أنك ترسلها الآن.
+`.trim();
+  }
+  return "";
+}
+
 function buildOwnerPrompt(store) {
   const prompt = String(store.ai_prompt || "").trim();
   if (!prompt) {
@@ -198,6 +210,7 @@ async function generateStoreChatReply({
   conversationMessages,
   memoryFacts,
   followups = [],
+  channelContext = null,
 }) {
   const allowedProductIds = new Set(
     (products || []).map((p) => Number(p.id)).filter((n) => Number.isInteger(n) && n > 0)
@@ -212,6 +225,7 @@ async function generateStoreChatReply({
   const ownerPrompt = buildOwnerPrompt(store);
   const memoryBlock = buildMemoryFactsBlock(memoryFacts);
   const followupsBlock = buildFollowupsBlock(followups);
+  const channelBlock = buildChannelContextBlock(channelContext);
   const historyMessages = buildConversationMessages(
     conversationMessages,
     messageText
@@ -237,7 +251,7 @@ async function generateStoreChatReply({
 قواعد recommended_product_ids (مهم جدًا):
 - ضع في المصفوفة فقط أرقام product_id موجودة حرفيًا في كتالوج «بيانات المتجر والمنتجات» أدناه. لا تخترع رقمًا.
 - إذا لم يكن هناك منتج مناسب، اترك المصفوفة [] ولا تدّعي وجود منتج.
-- املأ المصفوفة فقط عندما يكون العميل يريد رؤية منتجات في الواجهة (اقتراح، توفر، مقارنة خفيفة، «شنو عندكم»، «عرّفني»، «وش تنصح»، إضافة للسلة، استكشاف واضح).
+- املأ المصفوفة فقط عندما يكون العميل يريد رؤية منتجات في الواجهة (اقتراح، توفر، مقارنة خفيفة، «شنو عندكم»، «عرّفني»، «وش تنصح»، طلب صور/صورة المنتج، إضافة للسلة، استكشاف واضح).
 - اترك المصفوفة [] عندما يكون السؤال معلوماتيًا فقط (سياسة، توصيل عام، دفع، تحية، شكر) دون رغبة في عرض بطاقات منتجات.
 - لا تذكر في reply أن منتجًا «موجود» إذا لم تضع معرفه في recommended_product_ids.
 - الحد الأقصى ${MAX_RECOMMENDED_IDS} معرفات في المصفوفة.
@@ -259,7 +273,7 @@ ${jsonInstructions}
 - لا تؤكد طلبًا نهائيًا؛ ذكّر أن الاختيار من الواجهة أو السلة.
 
 تعليمات صاحب المتجر (ما لم تخالف الكتالوج):
-${ownerPrompt}${memoryBlock}${followupsBlock}`,
+${ownerPrompt}${channelBlock ? `\n\n${channelBlock}` : ""}${memoryBlock}${followupsBlock}`,
         },
         {
           role: "system",

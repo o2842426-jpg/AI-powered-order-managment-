@@ -276,6 +276,7 @@ export function OwnerDashboardPage({
   const [productSaving, setProductSaving] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [productEdit, setProductEdit] = useState(null);
+  const [productExtraImages, setProductExtraImages] = useState([]);
 
   const [variants, setVariants] = useState([]);
   const [variantsLoading, setVariantsLoading] = useState(false);
@@ -432,6 +433,7 @@ export function OwnerDashboardPage({
       base_price: selected.base_price,
       is_active: Boolean(selected.is_active),
     });
+    setProductExtraImages(Array.isArray(selected.images) ? selected.images : []);
     loadVariants(selected.id);
   }, [products, selectedProductId]);
 
@@ -814,6 +816,86 @@ export function OwnerDashboardPage({
       setDashboardMsg("تم رفع الصورة. احفظ المنتج لتثبيت الرابط.");
     } catch (error) {
       setDashboardMsg(error.message || "تعذر رفع الصورة.");
+    } finally {
+      setImageUploading(false);
+    }
+  }
+
+  function countProductImages(primaryUrl, extraImages) {
+    return (primaryUrl ? 1 : 0) + (extraImages?.length || 0);
+  }
+
+  async function uploadExtraProductImage(file) {
+    if (!file || !selectedProductId) return;
+
+    const total = countProductImages(productEdit?.image_url, productExtraImages);
+    if (total >= 5) {
+      setDashboardMsg("الحد الأقصى 5 صور لكل منتج (الصورة الرئيسية + 4 إضافية).");
+      return;
+    }
+
+    setImageUploading(true);
+    setDashboardMsg("");
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    try {
+      const uploadRes = await authFetch("/api/uploads/product-image", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadBody = await uploadRes.json().catch(() => ({}));
+      if (!uploadRes.ok) {
+        throw new Error(uploadBody.message || `تعذر رفع الصورة (${uploadRes.status})`);
+      }
+
+      const imageUrl = uploadBody.data?.image_url || "";
+      if (!imageUrl) {
+        throw new Error("لم يُرجع الخادم رابط الصورة.");
+      }
+
+      const res = await authFetch(`/api/products/${selectedProductId}/images`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_url: imageUrl }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.message || `تعذر إضافة الصورة (${res.status})`);
+      }
+
+      setProductExtraImages((prev) => [...prev, body.data]);
+      setDashboardMsg("تمت إضافة صورة إضافية للمنتج.");
+      await loadProducts();
+    } catch (error) {
+      setDashboardMsg(error.message || "تعذر إضافة الصورة الإضافية.");
+    } finally {
+      setImageUploading(false);
+    }
+  }
+
+  async function deleteExtraProductImage(imageId) {
+    if (!selectedProductId || !imageId) return;
+
+    setImageUploading(true);
+    setDashboardMsg("");
+
+    try {
+      const res = await authFetch(
+        `/api/products/${selectedProductId}/images/${imageId}`,
+        { method: "DELETE" }
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.message || `تعذر حذف الصورة (${res.status})`);
+      }
+
+      setProductExtraImages((prev) => prev.filter((img) => img.id !== imageId));
+      setDashboardMsg("تم حذف الصورة الإضافية.");
+      await loadProducts();
+    } catch (error) {
+      setDashboardMsg(error.message || "تعذر حذف الصورة.");
     } finally {
       setImageUploading(false);
     }
@@ -2248,6 +2330,47 @@ export function OwnerDashboardPage({
                 alt="معاينة المنتج"
               />
             )}
+            <div className="owner-dashboard__extra-images">
+              <h3>
+                صور إضافية (
+                {countProductImages(productEdit.image_url, productExtraImages)}/5)
+              </h3>
+              <p className="owner-dashboard__muted">
+                الصورة الرئيسية أعلاه + حتى 4 صور إضافية. تُرسل كلها في Instagram DM عند طلب
+                العميل.
+              </p>
+              {productExtraImages.length > 0 && (
+                <div className="owner-dashboard__extra-images-grid">
+                  {productExtraImages.map((image) => (
+                    <figure key={image.id} className="owner-dashboard__extra-image-card">
+                      <img src={mediaUrl(image.image_url)} alt="صورة إضافية" />
+                      <button
+                        type="button"
+                        className="is-secondary"
+                        disabled={imageUploading}
+                        onClick={() => deleteExtraProductImage(image.id)}
+                      >
+                        حذف
+                      </button>
+                    </figure>
+                  ))}
+                </div>
+              )}
+              {countProductImages(productEdit.image_url, productExtraImages) < 5 && (
+                <label>
+                  أضف صورة إضافية
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={imageUploading}
+                    onChange={(event) => {
+                      uploadExtraProductImage(event.target.files?.[0]);
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+              )}
+            </div>
             <label>
               السعر الأساسي ({storeCurrencyOptionLabel(settings?.currency_code)})
               <input

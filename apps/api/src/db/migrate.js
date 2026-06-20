@@ -22,6 +22,7 @@ function migrate(db) {
   ensureChatSessionLeadScoreColumns(db);
   ensureWebhookEventsTable(db);
   ensureChannelTables(db);
+  ensureProductImagesTable(db);
 }
 
 function ensureStoreSettingsColumns(db) {
@@ -355,6 +356,21 @@ function ensureChatSessionLeadScoreColumns(db) {
   if (!names.has("lead_scored_at")) {
     db.exec("ALTER TABLE chat_sessions ADD COLUMN lead_scored_at TEXT");
   }
+}
+
+function ensureProductImagesTable(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS product_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL,
+      image_url TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_product_images_product
+      ON product_images(product_id, sort_order);
+  `);
 }
 
 module.exports = { migrate };

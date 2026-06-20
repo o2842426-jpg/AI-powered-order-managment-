@@ -1,5 +1,6 @@
 const { db } = require("../../db/client");
 const { attachLeadPayloadToMessageRow } = require("../leads/leadScoring.service");
+const { loadProductImagesMap } = require("../../lib/productImages");
 
 function loadActiveProductCatalog(storeId) {
   const products = db
@@ -13,6 +14,11 @@ function loadActiveProductCatalog(storeId) {
     )
     .all(storeId);
 
+  const imageMap = loadProductImagesMap(
+    db,
+    products.map((product) => product.id)
+  );
+
   return products.map((product) => {
     const variants = db
       .prepare(
@@ -24,7 +30,11 @@ function loadActiveProductCatalog(storeId) {
       `
       )
       .all(product.id);
-    return { ...product, variants };
+    return {
+      ...product,
+      variants,
+      images: imageMap.get(product.id) || [],
+    };
   });
 }
 

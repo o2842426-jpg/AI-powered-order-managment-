@@ -1,5 +1,20 @@
 const { db } = require("../../db/client");
+const {
+  MAX_PRODUCT_IMAGES,
+  loadProductImagesMap,
+  countProductImages,
+} = require("../../lib/productImages");
 
+function attachImagesToProducts(products) {
+  const imageMap = loadProductImagesMap(
+    db,
+    products.map((p) => p.id)
+  );
+  return products.map((product) => ({
+    ...product,
+    images: imageMap.get(product.id) || [],
+  }));
+}
 
 function listProducts(req, res) {
   try {
@@ -18,7 +33,7 @@ function listProducts(req, res) {
       ORDER BY id DESC
     `);
 
-    const products = query.all(req.user.store_id);
+    const products = attachImagesToProducts(query.all(req.user.store_id));
     return res.status(200).json({ data: products });
   } catch (error) {
     return res.status(500).json({
@@ -363,6 +378,150 @@ function updateVariant(req, res) {
   }
 }
 
+function listProductImages(req, res) {
+  try {
+    const productId = Number(req.params.id);
+    if (Number.isNaN(productId) || productId <= 0) {
+      return res.status(400).json({
+        message: "Product id must be a valid positive number.",
+      });
+    }
+
+    const existingProduct = db
+      .prepare("SELECT id FROM products WHERE id = ? AND store_id = ?")
+      .get(productId, req.user.store_id);
+    if (!existingProduct) {
+      return res.status(404).json({ message: "Product not found." });
+    }
+
+    const images = db
+      .prepare(
+        `
+          SELECT id, product_id, image_url, sort_order, created_at
+          FROM product_images
+          WHERE product_id = ?
+          ORDER BY sort_order ASC, id ASC
+        `
+      )
+      .all(productId);
+
+    return res.status(200).json({ data: images });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Could not load product images.",
+      error: error.message,
+    });
+  }
+}
+
+function addProductImage(req, res) {
+  try {
+    const productId = Number(req.params.id);
+    const { image_url } = req.body;
+
+    if (Number.isNaN(productId) || productId <= 0) {
+      return res.status(400).json({
+        message: "Product id must be a valid positive number.",
+      });
+    }
+
+    const normalizedUrl = String(image_url || "").trim();
+    if (!normalizedUrl) {
+      return res.status(400).json({ message: "image_url is required." });
+    }
+
+    const existingProduct = db
+      .prepare("SELECT id FROM products WHERE id = ? AND store_id = ?")
+      .get(productId, req.user.store_id);
+    if (!existingProduct) {
+      return res.status(404).json({ message: "Product not found." });
+    }
+
+    if (countProductImages(db, productId) >= MAX_PRODUCT_IMAGES) {
+      return res.status(400).json({
+        message: `Each product can have at most ${MAX_PRODUCT_IMAGES} images.`,
+      });
+    }
+
+    const nextSort = db
+      .prepare(
+        "SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_sort FROM product_images WHERE product_id = ?"
+      )
+      .get(productId);
+
+    const result = db
+      .prepare(
+        `
+          INSERT INTO product_images (product_id, image_url, sort_order)
+          VALUES (?, ?, ?)
+        `
+      )
+      .run(productId, normalizedUrl, Number(nextSort?.next_sort || 0));
+
+    const created = db
+      .prepare(
+        `
+          SELECT id, product_id, image_url, sort_order, created_at
+          FROM product_images
+          WHERE id = ?
+        `
+      )
+      .get(result.lastInsertRowid);
+
+    return res.status(201).json({ data: created });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Could not add product image.",
+      error: error.message,
+    });
+  }
+}
+
+function deleteProductImage(req, res) {
+  try {
+    const productId = Number(req.params.id);
+    const imageId = Number(req.params.imageId);
+
+    if (Number.isNaN(productId) || productId <= 0) {
+      return res.status(400).json({
+        message: "Product id must be a valid positive number.",
+      });
+    }
+    if (Number.isNaN(imageId) || imageId <= 0) {
+      return res.status(400).json({
+        message: "Image id must be a valid positive number.",
+      });
+    }
+
+    const existingImage = db
+      .prepare(
+        `
+          SELECT pi.id
+          FROM product_images pi
+          JOIN products p ON p.id = pi.product_id
+          WHERE pi.id = ? AND pi.product_id = ? AND p.store_id = ?
+        `
+      )
+      .get(imageId, productId, req.user.store_id);
+
+    if (!existingImage) {
+      return res.status(404).json({ message: "Product image not found." });
+    }
+
+    db.prepare("DELETE FROM product_images WHERE id = ? AND product_id = ?").run(
+      imageId,
+      productId
+    );
+
+    return res.status(200).json({ data: { deleted: true } });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Could not delete product image.",
+      error: error.message,
+    });
+  }
+}
+
 module.exports = {
   listProducts,
   createProduct,
@@ -370,4 +529,7 @@ module.exports = {
   listVariants,
   createVariant,
   updateVariant,
+  listProductImages,
+  addProductImage,
+  deleteProductImage,
 };
