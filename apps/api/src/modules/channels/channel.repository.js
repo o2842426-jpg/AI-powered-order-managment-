@@ -528,6 +528,24 @@ function upsertInstagramChannelConnection({
   webhookSubscribed = 1,
   metadata = null,
 }) {
+  const igOwner = db
+    .prepare(
+      `
+        SELECT id, store_id
+        FROM channel_connections
+        WHERE platform = ? AND platform_instagram_id = ?
+      `
+    )
+    .get(PLATFORM, platformInstagramId);
+
+  if (igOwner && Number(igOwner.store_id) !== Number(storeId)) {
+    const err = new Error(
+      `Instagram account ${platformInstagramId} is already linked to store ${igOwner.store_id}.`
+    );
+    err.code = "IG_ALREADY_LINKED";
+    throw err;
+  }
+
   const existing = db
     .prepare(
       `

@@ -60,14 +60,16 @@ function initFacebookOAuth(req, res) {
  * Public Meta redirect — validates state, stores encrypted Page token, redirects to frontend.
  */
 async function facebookOAuthCallback(req, res) {
-  const fail = (reason, message) => {
+  const fail = (reason, message, detail) => {
     console.warn(`[facebook-oauth] callback failed (${reason}):`, message);
-    return res.redirect(
-      resolveFrontendSettingsUrl({
-        instagram: "error",
-        reason,
-      })
-    );
+    const query = {
+      instagram: "error",
+      reason,
+    };
+    if (detail) {
+      query.detail = String(detail).slice(0, 180);
+    }
+    return res.redirect(resolveFrontendSettingsUrl(query));
   };
 
   try {
@@ -149,7 +151,17 @@ async function facebookOAuthCallback(req, res) {
       })
     );
   } catch (error) {
-    return fail("server_error", error?.message || String(error));
+    if (error?.code === "IG_ALREADY_LINKED") {
+      return fail("ig_already_linked", error.message, error.message);
+    }
+    if (String(error?.message || "").includes("UNIQUE")) {
+      return fail(
+        "ig_already_linked",
+        "This Instagram account is already linked to another store.",
+        error.message
+      );
+    }
+    return fail("server_error", error?.message || String(error), error?.message);
   }
 }
 

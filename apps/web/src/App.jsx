@@ -65,16 +65,21 @@ function App() {
       }
     } else if (instagram === "error") {
       const reason = params.get("reason") || "unknown";
+      const detail = params.get("detail") || "";
       const reasonMessages = {
         no_ig_account:
           "لم نجد صفحة فيسبوك مربوطة بحساب Instagram Business. اربط IG Professional بصفحتك ثم أعد المحاولة.",
+        ig_already_linked:
+          "حساب إنستغرام هذا مربوط بمتجر آخر في ShopIQ. افصله من المتجر القديم أو استخدم حساب IG آخر.",
         oauth_denied: "ألغيت تسجيل الدخول إلى فيسبوك — لم يتم الربط.",
         invalid_state: "انتهت صلاحية جلسة الربط — أعد المحاولة من زر «ربط إنستغرام».",
         encryption_not_configured:
           "السيرفر غير مهيأ لتشفير التوكن — تواصل مع الدعم.",
         missing_code: "لم يصل رمز التفويض من فيسبوك.",
         token_exchange_failed: "تعذّر استبدال رمز فيسبوك بتوكن — أعد المحاولة.",
-        server_error: "حدث خطأ أثناء الربط — أعد المحاولة.",
+        server_error: detail
+          ? `حدث خطأ أثناء الربط: ${detail}`
+          : "حدث خطأ أثناء الربط — أعد المحاولة.",
       };
       setOauthToast({
         type: "error",
@@ -90,6 +95,7 @@ function App() {
 
     params.delete("instagram");
     params.delete("reason");
+    params.delete("detail");
     const qs = params.toString();
     window.history.replaceState({}, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
   }, []);
