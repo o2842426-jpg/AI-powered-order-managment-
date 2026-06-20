@@ -1609,7 +1609,7 @@ export function OwnerDashboardPage({
             Tokens يدويًا.
           </p>
           <details className="owner-dashboard__ig-meta-setup">
-            <summary>إعداد Meta (إذا ظهر خطأ «App Domains»)</summary>
+            <summary>إعداد Meta (أخطاء الربط الشائعة)</summary>
             <ol>
               <li>
                 Meta App → <strong>Settings → Basic → App domains</strong>: أضف{" "}
@@ -1624,6 +1624,15 @@ export function OwnerDashboardPage({
               <li>
                 Meta App → <strong>Website → Site URL</strong>:{" "}
                 <code dir="ltr">https://www.shopiq.me</code>
+              </li>
+              <li>
+                على الكمبيوتر: سجّل الدخول في فيسبوك بنفس الحساب المضاف كـ{" "}
+                <strong>Tester</strong> في التطبيق (قد يكون الكمبيوتر بحساب مختلف عن الجوال).
+              </li>
+              <li>
+                إذا ظهر على الجوال <strong>App not active</strong>: التطبيق في وضع Development.
+                إمّا تفعّل <strong>Live</strong> من لوحة Meta، أو أضف حساب فيسبوك/إنستغرام
+                المستخدم كـ <strong>Tester</strong> داخل App Roles.
               </li>
               <li>
                 تأكد أن المنتجات <strong>Messenger</strong> و{" "}
@@ -2279,42 +2288,54 @@ export function OwnerDashboardPage({
             </p>
 
             <h3 className="owner-dashboard__options-subtitle">إضافة خيار جديد</h3>
-            <div className="owner-dashboard__compact-grid">
-              <label>
-                مواصفة 1 (اختياري — مثل السعة، الحجم، النكهة…)
+            <div className="owner-dashboard__compact-grid owner-dashboard__option-form">
+              <div className="owner-dashboard__option-field">
+                <span className="owner-dashboard__option-label">مواصفة 1 — الحجم / السعة / النكهة</span>
                 <input
+                  className="owner-dashboard__option-input"
                   value={variantDraft.size}
+                  placeholder="مثال: M أو 500ml"
                   onChange={(event) =>
                     setVariantDraft({ ...variantDraft, size: event.target.value })
                   }
                 />
-              </label>
-              <label>
-                مواصفة 2 (اختياري — مثل اللون، الإصدار، العبوة…)
+              </div>
+              <div className="owner-dashboard__option-field">
+                <span className="owner-dashboard__option-label">مواصفة 2 — اللون / الإصدار / العبوة</span>
                 <input
+                  className="owner-dashboard__option-input"
                   value={variantDraft.color}
+                  placeholder="مثال: أحمر أو v2"
                   onChange={(event) =>
                     setVariantDraft({ ...variantDraft, color: event.target.value })
                   }
                 />
-              </label>
-              <label>
-                سعر الخيار (اختياري — {storeCurrencyOptionLabel(settings?.currency_code)})
+              </div>
+              <div className="owner-dashboard__option-field">
+                <span className="owner-dashboard__option-label">
+                  سعر الخيار (اختياري — {storeCurrencyOptionLabel(settings?.currency_code)})
+                </span>
                 <input
+                  className="owner-dashboard__option-input"
                   type="number"
                   min="0"
+                  placeholder="0"
                   value={variantDraft.price}
                   onChange={(event) =>
                     setVariantDraft({ ...variantDraft, price: event.target.value })
                   }
                 />
-              </label>
-              <label>
-                المخزون <span className="owner-dashboard__req">*</span>
+              </div>
+              <div className="owner-dashboard__option-field">
+                <span className="owner-dashboard__option-label">
+                  المخزون <span className="owner-dashboard__req">*</span>
+                </span>
                 <input
+                  className="owner-dashboard__option-input"
                   type="number"
                   min="0"
                   step="1"
+                  placeholder="الكمية المتوفرة"
                   value={variantDraft.stock_qty}
                   onChange={(event) =>
                     setVariantDraft({
@@ -2323,16 +2344,18 @@ export function OwnerDashboardPage({
                     })
                   }
                 />
-              </label>
-              <label>
-                SKU (اختياري)
+              </div>
+              <div className="owner-dashboard__option-field owner-dashboard__option-field--wide">
+                <span className="owner-dashboard__option-label">SKU (اختياري)</span>
                 <input
+                  className="owner-dashboard__option-input"
                   value={variantDraft.sku}
+                  placeholder="SKU-001"
                   onChange={(event) =>
                     setVariantDraft({ ...variantDraft, sku: event.target.value })
                   }
                 />
-              </label>
+              </div>
             </div>
             <button
               type="button"
@@ -2387,28 +2410,35 @@ export function OwnerDashboardPage({
                         </em>
                       </div>
 
-                      <div className="owner-dashboard__variant-fields">
-                        <label>
-                          مواصفة 1
+                      <div className="owner-dashboard__variant-fields owner-dashboard__option-form">
+                        <div className="owner-dashboard__option-field">
+                          <span className="owner-dashboard__option-label">مواصفة 1 — الحجم / السعة</span>
                           <input
+                            className="owner-dashboard__option-input"
                             value={variant.size || ""}
+                            placeholder="مثال: M"
                             onChange={(event) =>
                               updateVariantDraft(index, "size", event.target.value)
                             }
                           />
-                        </label>
-                        <label>
-                          مواصفة 2
+                        </div>
+                        <div className="owner-dashboard__option-field">
+                          <span className="owner-dashboard__option-label">مواصفة 2 — اللون / الإصدار</span>
                           <input
+                            className="owner-dashboard__option-input"
                             value={variant.color || ""}
+                            placeholder="مثال: أحمر"
                             onChange={(event) =>
                               updateVariantDraft(index, "color", event.target.value)
                             }
                           />
-                        </label>
-                        <label>
-                          السعر ({storeCurrencyOptionLabel(settings?.currency_code)})
+                        </div>
+                        <div className="owner-dashboard__option-field">
+                          <span className="owner-dashboard__option-label">
+                            السعر ({storeCurrencyOptionLabel(settings?.currency_code)})
+                          </span>
                           <input
+                            className="owner-dashboard__option-input"
                             type="number"
                             min="0"
                             value={variant.price ?? ""}
@@ -2416,10 +2446,11 @@ export function OwnerDashboardPage({
                               updateVariantDraft(index, "price", event.target.value)
                             }
                           />
-                        </label>
-                        <label>
-                          المخزون
+                        </div>
+                        <div className="owner-dashboard__option-field">
+                          <span className="owner-dashboard__option-label">المخزون</span>
                           <input
+                            className="owner-dashboard__option-input"
                             type="number"
                             min="0"
                             value={variant.stock_qty}
@@ -2427,16 +2458,17 @@ export function OwnerDashboardPage({
                               updateVariantDraft(index, "stock_qty", event.target.value)
                             }
                           />
-                        </label>
-                        <label>
-                          SKU
+                        </div>
+                        <div className="owner-dashboard__option-field owner-dashboard__option-field--wide">
+                          <span className="owner-dashboard__option-label">SKU</span>
                           <input
+                            className="owner-dashboard__option-input"
                             value={variant.sku || ""}
                             onChange={(event) =>
                               updateVariantDraft(index, "sku", event.target.value)
                             }
                           />
-                        </label>
+                        </div>
                       </div>
 
                       <button
