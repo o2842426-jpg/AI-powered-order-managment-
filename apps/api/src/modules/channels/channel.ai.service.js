@@ -1,6 +1,6 @@
 const { db } = require("../../db/client");
 const { generateStoreChatReply } = require("../ai/ai.service");
-const { hasOwnerToolAccess } = require("../billing/billing.access");
+const { hasOwnerToolAccess, ownerAccessReason } = require("../billing/billing.access");
 const { isBillingEnforced } = require("../billing/billing.config");
 const {
   evaluateAiMessageQuota,
@@ -97,7 +97,9 @@ async function processChannelAiReply({
   }
 
   if (!hasOwnerToolAccess(store)) {
-    console.info(`[channel-ai] skip store=${storeId} — billing/access`);
+    console.info(
+      `[channel-ai] skip store=${storeId} — billing/access (${ownerAccessReason(store)})`
+    );
     return;
   }
 
