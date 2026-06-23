@@ -1,6 +1,7 @@
 const { db } = require("../../db/client");
 const { computeStoreAnalytics } = require("../analytics/storeAnalytics.service");
 const { assertStoreScope } = require("./storeScope");
+const { storeHasFeature } = require("../plans/planEntitlements");
 
 const STORE_CURRENCY_CODES = new Set(["SAR", "IQD", "USD"]);
 
@@ -194,7 +195,9 @@ function getStoreSummary(req, res) {
       )
       .get(storeId);
 
-    const analytics = computeStoreAnalytics(db, storeId);
+    const analytics = computeStoreAnalytics(db, storeId, {
+      advanced: storeHasFeature(storeId, "advanced_analytics"),
+    });
 
     return res.status(200).json({
       data: {
@@ -204,6 +207,7 @@ function getStoreSummary(req, res) {
         low_stock_variants: lowStock.count || 0,
         latest_order: latestOrder || null,
         analytics,
+        analytics_advanced_available: analytics.level === "advanced",
       },
     });
   } catch (error) {

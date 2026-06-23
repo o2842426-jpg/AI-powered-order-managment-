@@ -4,6 +4,7 @@ const {
   isBillingEnforced,
   getFrontendBaseUrl,
 } = require("./billing.config");
+const { isDemoTrialStore } = require("./billing.demoOverride");
 const {
   hasOwnerToolAccess,
   ownerAccessReason,
@@ -29,7 +30,7 @@ function getStripe() {
 
 function getBillingStatus(req, res) {
   try {
-    const enforced = isBillingEnforced();
+    const enforced = isBillingEnforced() || isDemoTrialStore(req.user.store_id);
     const row = db
       .prepare(
         `
@@ -63,7 +64,9 @@ function getBillingStatus(req, res) {
       )
       .get(req.user.store_id);
 
-    const effectiveTier = effectivePlanTierForStore(row || {});
+    const effectiveTier = isDemoTrialStore(req.user.store_id)
+      ? "trial"
+      : effectivePlanTierForStore(row || {});
     const aiLimit = getAiMessageMonthlyLimit(effectiveTier);
     const used = Number(usageRow?.ai_messages_used || 0);
 
@@ -82,6 +85,7 @@ function getBillingStatus(req, res) {
         ai_messages_used: used,
         ai_messages_monthly_limit: aiLimit,
         capabilities: getCapabilitiesForTier(effectiveTier),
+        demo_trial_enforced: isDemoTrialStore(req.user.store_id),
       },
     });
   } catch (error) {

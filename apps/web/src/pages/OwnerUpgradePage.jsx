@@ -15,6 +15,56 @@ function formatTrialEnd(iso) {
   }
 }
 
+/**
+ * Feature bullets aligned with apps/api/src/modules/plans/planMatrix.js
+ * and requirePlanFeature middleware — no unimplemented marketing claims.
+ */
+const PLAN_CATALOG = [
+  {
+    id: "starter",
+    title: "Starter",
+    price: "$19",
+    blurb: "متجر كامل + مساعد AI + إحصائيات أساسية",
+    bullets: [
+      "متجر، منتجات، طلبات، ومخزون",
+      "مساعد AI في واجهة المتجر ورسائل Instagram DM",
+      "اقتراح منتجات وصور في المحادثة",
+      "حتى 1,000 رسالة AI شهريًا",
+      "إحصائيات أساسية: إيراد إجمالي وعدد العملاء والطلبات",
+      "لا تشمل: لوحة المحادثات، الرد اليدوي، التحليلات المتقدمة، تقييم الاهتمام",
+    ],
+  },
+  {
+    id: "growth",
+    title: "Growth",
+    price: "$49",
+    badge: "الأكثر شيوعًا",
+    blurb: "لوحة المحادثات + تحليلات أعمق",
+    bullets: [
+      "كل ما في Starter",
+      "حتى 10,000 رسالة AI شهريًا",
+      "لوحة المحادثات (متجر + Instagram DM)",
+      "الرد اليدوي (Takeover) وإرسال رسائل من لوحتك",
+      "تحليلات متقدمة: CLV، الاحتفاظ، التخلي عن السلة، دوران المخزون، توقع المبيعات، مخطط الإيراد",
+      "لا تشمل: ذاكرة AI، عبارات المتابعة، مهام المتابعة، تقييم الاهتمام",
+    ],
+  },
+  {
+    id: "pro",
+    title: "Pro",
+    price: "$99",
+    blurb: "أدوات مبيعات AI المتقدمة",
+    bullets: [
+      "كل ما في Growth",
+      "رسائل AI غير محدودة شهريًا (عمليًا)",
+      "حقائق الذاكرة — يتذكرها المساعد في الردود",
+      "عبارات المتابعة التي يدمجها AI طبيعيًا",
+      "مهام متابعة مقترحة داخل لوحة المحادثات",
+      "تقييم اهتمام العميل (Lead score) إرشادي",
+    ],
+  },
+];
+
 export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStore }) {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutPlan, setCheckoutPlan] = useState("growth");
@@ -49,27 +99,7 @@ export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStor
     }
   }
 
-  const planCards = [
-    {
-      id: "starter",
-      title: "Starter",
-      price: "$19",
-      blurb: "ردود AI، توصيات، حتى 1000 رسالة شهريًا",
-    },
-    {
-      id: "growth",
-      title: "Growth",
-      price: "$49",
-      badge: "الأكثر شيوعًا",
-      blurb: "لوحة محادثات، تحليلات أعمق، حتى 10k رسالة",
-    },
-    {
-      id: "pro",
-      title: "Pro",
-      price: "$99",
-      blurb: "مبيعات AI متقدمة — رسائل غير محدودة عمليًا",
-    },
-  ];
+  const selectedPlan = PLAN_CATALOG.find((p) => p.id === checkoutPlan) || PLAN_CATALOG[1];
 
   return (
     <div className="owner-upgrade" dir="rtl">
@@ -80,16 +110,12 @@ export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStor
             رقِّ موظف المبيعات الرقمي لديك
           </h1>
           <p className="owner-upgrade__lead">
-            كل رد متأخر هو عميل محتمل ضاع. حوّل رسائل إنستغرام وتيك توك إلى{" "}
-            <strong>موظف مبيعات بالذكاء الاصطناعي يعمل 24/7</strong> داخل متجرك.
+            الخطط أدناه تعكس ما يفرضه النظام فعليًا في الكود — بدون ميزات وهمية.
+            التجربة المجانية (7 أيام) تعطيك نفس حدود Starter مع 1,000 رسالة AI شهريًا.
           </p>
-          <blockquote className="owner-upgrade__quote">
-            موظف واحد قد يكلفك مئات الدولارات شهريًا. مساعد المبيعات الذكي يبدأ من سعر رمزي —
-            بنفس الاحتراف، وبلا تعب التوظيف والورديات.
-          </blockquote>
           <p className="owner-upgrade__sub">{subline}</p>
           <div className="owner-upgrade__plans" role="group" aria-label="اختر الخطة">
-            {planCards.map((card) => {
+            {PLAN_CATALOG.map((card) => {
               const selected = checkoutPlan === card.id;
               return (
                 <button
@@ -120,7 +146,7 @@ export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStor
               disabled={checkoutLoading}
               onClick={handleCheckout}
             >
-              {checkoutLoading ? "جاري التحويل…" : "فعّل الاشتراك الآن"}
+              {checkoutLoading ? "جاري التحويل…" : `فعّل ${selectedPlan.title} الآن`}
             </button>
             <button type="button" className="owner-upgrade__btn owner-upgrade__btn--ghost" onClick={onPreviewStore}>
               معاينة المتجر كزائر
@@ -129,21 +155,24 @@ export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStor
         </div>
       </section>
 
-      {(priceLine || planBullets.length > 0) && (
-        <section className="owner-upgrade__pricing" aria-labelledby="owner-upgrade-pricing-title">
-          <h2 id="owner-upgrade-pricing-title" className="owner-upgrade__section-title">
-            الخطة والتسعير
-          </h2>
-          {priceLine ? <p className="owner-upgrade__price-line">{priceLine}</p> : null}
-          {planBullets.length > 0 ? (
-            <ul className="owner-upgrade__plan-bullets">
-              {planBullets.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
-      )}
+      <section className="owner-upgrade__pricing" aria-labelledby="owner-upgrade-features-title">
+        <h2 id="owner-upgrade-features-title" className="owner-upgrade__section-title">
+          ما الذي تحصل عليه في {selectedPlan.title}؟
+        </h2>
+        <ul className="owner-upgrade__plan-bullets">
+          {selectedPlan.bullets.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+        {priceLine ? <p className="owner-upgrade__price-line">{priceLine}</p> : null}
+        {planBullets.length > 0 ? (
+          <ul className="owner-upgrade__plan-bullets owner-upgrade__plan-bullets--env">
+            {planBullets.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
 
       <section className="owner-upgrade__compare" aria-labelledby="owner-upgrade-compare-title">
         <h2 id="owner-upgrade-compare-title" className="owner-upgrade__section-title">
@@ -156,7 +185,6 @@ export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStor
               <li>ساعات محدودة وإجازات</li>
               <li>تكلفة ثابتة عالية كل شهر</li>
               <li>تذبذب في سرعة الرد وجودة الإجابة</li>
-              <li>صعوبة توسيع نفس الأسلوب على كل العملاء</li>
             </ul>
           </article>
           <article className="owner-upgrade__card owner-upgrade__card--accent">
@@ -166,7 +194,6 @@ export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStor
               <li>متاح دائمًا — ليلًا، في العطل، في الذروة</li>
               <li>يعرف منتجاتك ومخزونك وأسعارك من قاعدة البيانات</li>
               <li>نبرة متسقة مع علامتك (قابلة للضبط من لوحتك)</li>
-              <li>يقود المحادثة نحو الطلب دون إزعاج</li>
             </ul>
           </article>
         </div>
@@ -178,11 +205,6 @@ export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStor
           تتم إدارة الاشتراك عبر Stripe: بوابة دفع معروفة، فواتير واضحة، وإمكانية إدارة
           الفوترة لاحقًا من حسابك بعد التفعيل.
         </p>
-        <ul className="owner-upgrade__trust-list">
-          <li>لا نخزّن بيانات بطاقتك على خوادمنا</li>
-          <li>يمكنك إلغاء أو تعديل الاشتراك من بوابة الفوترة بعد أول دفع</li>
-          <li>بيانات متجرك تبقى تحت حسابك</li>
-        </ul>
       </section>
 
       <section className="owner-upgrade__footer-cta">
@@ -193,7 +215,7 @@ export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStor
           disabled={checkoutLoading}
           onClick={handleCheckout}
         >
-          {checkoutLoading ? "جاري التحويل…" : "ابدأ الاشتراك"}
+          {checkoutLoading ? "جاري التحويل…" : `ابدأ ${selectedPlan.title}`}
         </button>
       </section>
     </div>

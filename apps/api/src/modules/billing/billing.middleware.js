@@ -1,5 +1,5 @@
 const { db } = require("../../db/client");
-const { isBillingEnforced } = require("./billing.config");
+const { shouldEnforcePlansForStore } = require("./billing.demoOverride");
 const {
   hasOwnerToolAccess,
   ownerAccessReason,
@@ -11,7 +11,7 @@ const {
  * If billing is not configured, all owners keep full access (local dev).
  */
 function requireActiveSubscription(req, res, next) {
-  if (!isBillingEnforced()) {
+  if (!shouldEnforcePlansForStore(req.user?.store_id)) {
     return next();
   }
 

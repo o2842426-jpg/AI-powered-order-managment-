@@ -250,6 +250,7 @@ export function OwnerDashboardPage({
   onNavigate,
   onGoToOrders,
   onPreviewStore,
+  onGoUpgrade,
   billingStatus = null,
 }) {
   const storeId = getOwnerStoreIdFromAuth();
@@ -307,6 +308,12 @@ export function OwnerDashboardPage({
     if (!billingStatus?.billing_enforced) return true;
     const caps = billingStatus?.capabilities;
     return Array.isArray(caps) && caps.includes("customer_memory");
+  }, [billingStatus]);
+
+  const canAdvancedAnalytics = useMemo(() => {
+    if (!billingStatus?.billing_enforced) return true;
+    const caps = billingStatus?.capabilities;
+    return Array.isArray(caps) && caps.includes("advanced_analytics");
   }, [billingStatus]);
   useEffect(() => {
     if (!storeId) {
@@ -1345,8 +1352,40 @@ export function OwnerDashboardPage({
             </OwnerMetricCard>
           </section>
 
-          {(() => {
-            const analytics = summary.analytics ?? EMPTY_DASHBOARD_ANALYTICS;
+          {!canAdvancedAnalytics && summary.analytics?.level === "basic" ? (
+            <section className="owner-dashboard__card owner-dashboard__basic-analytics">
+              <h2>إحصائيات أساسية</h2>
+              <p className="owner-dashboard__muted">
+                خطتك الحالية تعرض الأرقام الأساسية فقط. التحليلات المتقدمة (CLV، الاحتفاظ،
+                التنبؤ، مخطط الإيراد) متاحة من خطة Growth فما فوق.
+              </p>
+              <ul className="owner-dashboard__basic-analytics-list">
+                <li>
+                  <strong>إيراد إجمالي:</strong>{" "}
+                  {formatUsd(summary.analytics.lifetime_revenue ?? 0)}
+                </li>
+                <li>
+                  <strong>عملاء طلبوا:</strong> {summary.analytics.ordering_customers ?? 0}
+                </li>
+                <li>
+                  <strong>طلبات آخر 30 يومًا:</strong>{" "}
+                  {summary.analytics.orders_last_30_days ?? 0}
+                </li>
+              </ul>
+              {billingStatus?.billing_enforced ? (
+                <button type="button" className="dm-btn dm-btn--secondary" onClick={onGoUpgrade}>
+                  ترقية لـ Growth للتحليلات المتقدمة
+                </button>
+              ) : null}
+            </section>
+          ) : null}
+
+          {canAdvancedAnalytics
+            ? (() => {
+            const analytics =
+              summary.analytics?.level === "advanced"
+                ? summary.analytics
+                : EMPTY_DASHBOARD_ANALYTICS;
             return (
             <section
               className="owner-dashboard__summary owner-dashboard__summary--analytics"
@@ -1512,11 +1551,12 @@ export function OwnerDashboardPage({
               </OwnerMetricCard>
             </section>
             );
-          })()}
+          })()
+            : null}
         </>
       )}
 
-      {summary && (
+      {summary && canAdvancedAnalytics && summary.analytics?.level === "advanced" ? (
         <section className="owner-dashboard__analytics-charts" aria-label="مخطط الإيراد">
           <div className="owner-dashboard__analytics-charts-head">
             <p className="owner-dashboard__eyebrow">تحليلات</p>
@@ -1526,10 +1566,10 @@ export function OwnerDashboardPage({
             </p>
           </div>
           <OwnerIncomeChartCard
-            incomeChart={(summary.analytics ?? EMPTY_DASHBOARD_ANALYTICS).income_chart}
+            incomeChart={summary.analytics.income_chart ?? EMPTY_DASHBOARD_ANALYTICS.income_chart}
           />
         </section>
-      )}
+      ) : null}
 
       <section className="owner-dashboard__onboarding">
         <div className="owner-dashboard__onboarding-intro">

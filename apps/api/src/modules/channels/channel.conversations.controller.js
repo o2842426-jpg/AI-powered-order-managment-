@@ -2,6 +2,10 @@ const { db } = require("../../db/client");
 const { assertStoreScope } = require("../stores/storeScope");
 const { sendInstagramTextWithEncryptedToken } = require("../instagram/instagram.send.service");
 const {
+  storeHasFeature,
+  sanitizeLeadScoreRow,
+} = require("../plans/planEntitlements");
+const {
   getChannelConversationForStore,
   updateChannelConversationTakeover,
   getActiveConnectionById,
@@ -89,7 +93,10 @@ function listChannelConversations(req, res) {
       )
       .all(...params);
 
-    return res.status(200).json({ data: rows });
+    const allowLeadScoring = storeHasFeature(storeId, "lead_scoring");
+    const data = rows.map((row) => sanitizeLeadScoreRow(row, allowLeadScoring));
+
+    return res.status(200).json({ data });
   } catch (error) {
     return res.status(500).json({
       message: "Could not list channel conversations.",
@@ -119,14 +126,18 @@ function getChannelConversationDetail(req, res) {
     }
 
     const messages = listChannelMessagesForStore(conversationId, 500);
+    const allowLeadScoring = storeHasFeature(storeId, "lead_scoring");
 
     return res.status(200).json({
       data: {
-        conversation: {
-          ...conversation,
-          started_at: conversation.created_at,
-          channel: conversation.platform,
-        },
+        conversation: sanitizeLeadScoreRow(
+          {
+            ...conversation,
+            started_at: conversation.created_at,
+            channel: conversation.platform,
+          },
+          allowLeadScoring
+        ),
         messages,
       },
     });

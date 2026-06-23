@@ -1,5 +1,8 @@
 const { db } = require("../../db/client");
-const { isBillingEnforced } = require("../billing/billing.config");
+const {
+  isDemoTrialStore,
+  shouldEnforcePlansForStore,
+} = require("../billing/billing.demoOverride");
 const {
   effectivePlanTierForStore,
   tierMeetsFeature,
@@ -17,6 +20,10 @@ const PLAN_FEATURE_MESSAGES = {
     "This feature requires Pro. Upgrade your plan to add follow-up phrases your storefront AI can use naturally in replies.",
   followup_tasks:
     "This feature requires Pro. Upgrade your plan to see suggested follow-up tasks for customer chats in your dashboard.",
+  lead_scoring:
+    "This feature requires Pro. Upgrade your plan to use AI lead scoring.",
+  advanced_analytics:
+    "This feature requires Growth or Pro. Upgrade your plan for advanced analytics insights.",
 };
 
 /**
@@ -25,14 +32,12 @@ const PLAN_FEATURE_MESSAGES = {
  */
 function requirePlanFeature(featureKey) {
   return (req, res, next) => {
-    if (!isBillingEnforced()) {
-      return next();
-
-    }
-
     const storeId = Number(req.params.storeId);
     if (Number.isNaN(storeId) || storeId <= 0) {
       return res.status(400).json({ message: "storeId must be a valid positive number." });
+    }
+    if (!shouldEnforcePlansForStore(storeId)) {
+      return next();
     }
     if (req.user?.store_id !== storeId) {
       return res.status(403).json({ message: "Forbidden for this store." });
@@ -48,7 +53,9 @@ function requirePlanFeature(featureKey) {
       )
       .get(storeId);
 
-    const tier = effectivePlanTierForStore(row || {});
+    const tier = isDemoTrialStore(storeId)
+      ? "trial"
+      : effectivePlanTierForStore(row || {});
     if (!tierMeetsFeature(tier, featureKey)) {
       const message =
         PLAN_FEATURE_MESSAGES[featureKey] ||

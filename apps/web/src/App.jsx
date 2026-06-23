@@ -391,6 +391,7 @@ function App() {
           }}
           onGoToOrders={() => setView("orders")}
           onPreviewStore={() => setView("store")}
+          onGoUpgrade={() => setView("upgrade")}
           billingStatus={billingStatus}
         />
       );

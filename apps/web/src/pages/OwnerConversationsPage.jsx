@@ -53,6 +53,9 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
   const canFollowupTasks =
     !billingStatus?.billing_enforced ||
     (Array.isArray(caps) && caps.includes("followup_tasks"));
+  const canLeadScoring =
+    !billingStatus?.billing_enforced ||
+    (Array.isArray(caps) && caps.includes("lead_scoring"));
   const [followupTasks, setFollowupTasks] = useState([]);
   const [followupTasksLoading, setFollowupTasksLoading] = useState(false);
   const [followupTasksError, setFollowupTasksError] = useState("");
@@ -521,7 +524,9 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                       {Number(row.owner_takeover) === 1 ? (
                         <span className="owner-conv__takeover-pill">يدوي</span>
                       ) : null}
-                      {row.lead_score != null && row.lead_score !== "" ? (
+                      {canLeadScoring &&
+                      row.lead_score != null &&
+                      row.lead_score !== "" ? (
                         <span
                           className="owner-conv__lead-pill"
                           title={row.lead_score_reason ? String(row.lead_score_reason) : undefined}
@@ -578,7 +583,9 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                     ? ` · آخر نشاط ${formatDt(detail.conversation.last_message_at)}`
                     : ""}
                 </p>
-                {detail.conversation.lead_score != null && detail.conversation.lead_score !== "" ? (
+                {canLeadScoring &&
+                detail.conversation.lead_score != null &&
+                detail.conversation.lead_score !== "" ? (
                   <p className="owner-conv__lead-panel" dir="auto">
                     <strong>تقييم اهتمام (إرشادي):</strong> {Number(detail.conversation.lead_score)}/100
                     {detail.conversation.lead_score_reason ? (
@@ -678,7 +685,10 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                         ))}
                       </div>
                     ) : null}
-                    {m.sender_type === "customer" && m.lead_score != null && m.lead_score !== "" ? (
+                    {canLeadScoring &&
+                    m.sender_type === "customer" &&
+                    m.lead_score != null &&
+                    m.lead_score !== "" ? (
                       <p className="owner-conv__bubble-lead" dir="auto">
                         تقييم الرسالة: {Number(m.lead_score)}/100
                         {m.lead_score_reason ? ` — ${String(m.lead_score_reason)}` : ""}

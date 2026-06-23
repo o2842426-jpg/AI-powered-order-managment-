@@ -1,6 +1,12 @@
 const { db } = require("../../db/client");
 const {
-  effectivePlanTierForStore,
+  isDemoTrialStore,
+  shouldEnforcePlansForStore,
+} = require("../billing/billing.demoOverride");
+const {
+  getStorePlanContext,
+} = require("./planEntitlements");
+const {
   getAiMessageMonthlyLimit,
 } = require("./planMatrix");
 
@@ -49,7 +55,7 @@ function evaluateAiMessageQuota(storeRow) {
     )
     .get(storeRow.id);
 
-  const tier = effectivePlanTierForStore(fresh);
+  const { tier } = getStorePlanContext(fresh.id);
   const limit = getAiMessageMonthlyLimit(tier);
   const used = Number(fresh?.ai_messages_used || 0);
 

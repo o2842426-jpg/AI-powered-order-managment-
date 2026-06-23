@@ -1,12 +1,18 @@
 const { db } = require("../../db/client");
 const { generateStoreChatReply } = require("../ai/ai.service");
 const { hasOwnerToolAccess } = require("../billing/billing.access");
-const { isBillingEnforced } = require("../billing/billing.config");
+const { shouldEnforcePlansForStore } = require("../billing/billing.demoOverride");
 const { evaluateAiMessageQuota, incrementAiMessageUsage } = require("../plans/aiUsage");
-const { effectivePlanTierForStore, tierMeetsFeature } = require("../plans/planMatrix");
+const { tierMeetsFeature } = require("../plans/planMatrix");
 const { normalizePublicStoreSlug } = require("./publicSlug");
 const { loadActiveProductCatalog, enrichPublicChatMessage } = require("./public.chat.service");
 const { refreshLeadScoreAfterCustomerMessage } = require("../leads/leadScoring.service");
+const {
+  getStorePlanContext,
+  storeHasFeature,
+  sanitizeLeadScoreRow,
+  sanitizeLeadScoreMessage,
+} = require("../plans/planEntitlements");
 
 function createChatSession(req, res) {
   try {
@@ -56,9 +62,11 @@ WHERE id = ?
 
     const session = selectSessionQuery.get(result.lastInsertRowid);
 
+    const allowLeadScoring = storeHasFeature(store.id, "lead_scoring");
+
     return res.status(201).json({
       message: "Chat session created successfully.",
-      data: session,
+      data: sanitizeLeadScoreRow(session, allowLeadScoring),
     });
   } catch (err) {
     return res.status(500).json({
@@ -112,13 +120,14 @@ async function sendChatMessage(req, res) {
       return res.status(404).json({ message: "Store not found." });
     }
 
-    const tier = effectivePlanTierForStore(store);
+    const { tier } = getStorePlanContext(store.id);
+    const enforcePlans = shouldEnforcePlansForStore(store.id);
     const allowLeadScoring =
-      !isBillingEnforced() || tierMeetsFeature(tier, "lead_scoring");
+      !enforcePlans || tierMeetsFeature(tier, "lead_scoring");
     const allowMemory =
-      !isBillingEnforced() || tierMeetsFeature(tier, "customer_memory");
+      !enforcePlans || tierMeetsFeature(tier, "customer_memory");
     const allowFollowups =
-      !isBillingEnforced() || tierMeetsFeature(tier, "ai_followups");
+      !enforcePlans || tierMeetsFeature(tier, "ai_followups");
 
     const sessionQuery = db.prepare(`
         SELECT id, store_id, channel, owner_takeover,
@@ -331,6 +340,8 @@ WHERE id = ? AND store_id = ?`
       return res.status(404).json({ message: "Chat session not found." });
     }
 
+    const allowLeadScoring = storeHasFeature(storeQ.id, "lead_scoring");
+
     const chat_messages = db.prepare(`
         SELECT id, session_id, sender_type, message_text, intent, payload, created_at
 FROM chat_messages
@@ -340,11 +351,13 @@ ORDER BY id ASC`);
     const rows = chat_messages.all(session.id);
 
     const catalog = loadActiveProductCatalog(storeQ.id);
-    const messages = rows.map((row) => enrichPublicChatMessage(row, catalog));
+    const messages = rows
+      .map((row) => enrichPublicChatMessage(row, catalog))
+      .map((row) => sanitizeLeadScoreMessage(row, allowLeadScoring));
 
     return res.status(200).json({
       data: {
-        session,
+        session: sanitizeLeadScoreRow(session, allowLeadScoring),
         messages,
       },
     });

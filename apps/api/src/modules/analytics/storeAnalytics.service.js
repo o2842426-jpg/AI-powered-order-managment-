@@ -7,9 +7,49 @@ const { roundMoney2 } = require("./storeAnalytics.helpers");
 const { computeIncomeChart } = require("./storeAnalytics.incomeChart");
 
 /**
- * Light analytics bundle for the store — no extra tables, from orders/sessions/inventory.
+ * Basic analytics for trial/starter (`basic_analytics` tier).
  */
-function computeStoreAnalytics(db, storeId) {
+function computeBasicStoreAnalytics(db, storeId) {
+  const lifetime = db
+    .prepare(
+      `
+        SELECT
+          COALESCE(SUM(total_amount), 0) AS revenue,
+          COUNT(DISTINCT customer_id) AS customers
+        FROM orders
+        WHERE store_id = ?
+          AND status != 'cancelled'
+      `
+    )
+    .get(storeId);
+
+  const customers = Number(lifetime.customers) || 0;
+  const revenue = Number(lifetime.revenue) || 0;
+
+  const orders30d = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS count
+        FROM orders
+        WHERE store_id = ?
+          AND status != 'cancelled'
+          AND datetime(created_at) >= datetime('now', '-30 days')
+      `
+    )
+    .get(storeId);
+
+  return {
+    level: "basic",
+    lifetime_revenue: Math.round(revenue * 100) / 100,
+    ordering_customers: customers,
+    orders_last_30_days: Number(orders30d?.count || 0),
+  };
+}
+
+/**
+ * Advanced bundle for growth/pro (`advanced_analytics` tier).
+ */
+function computeAdvancedStoreAnalytics(db, storeId) {
   const lifetime = db
     .prepare(
       `
@@ -197,6 +237,7 @@ function computeStoreAnalytics(db, storeId) {
   }
 
   return {
+    level: "advanced",
     clv: {
       avg_revenue_per_customer: Math.round(clvAvg * 100) / 100,
       ordering_customers: customers,
@@ -239,4 +280,20 @@ function computeStoreAnalytics(db, storeId) {
   };
 }
 
-module.exports = { computeStoreAnalytics };
+/**
+ * @param {import("better-sqlite3").Database} db
+ * @param {number} storeId
+ * @param {{ advanced?: boolean }} [options]
+ */
+function computeStoreAnalytics(db, storeId, options = {}) {
+  if (options.advanced) {
+    return computeAdvancedStoreAnalytics(db, storeId);
+  }
+  return computeBasicStoreAnalytics(db, storeId);
+}
+
+module.exports = {
+  computeBasicStoreAnalytics,
+  computeAdvancedStoreAnalytics,
+  computeStoreAnalytics,
+};

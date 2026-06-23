@@ -1,6 +1,11 @@
 const { db } = require("../../db/client");
 const { attachLeadPayloadToMessageRow } = require("../leads/leadScoring.service");
 const { assertStoreScope } = require("./storeScope");
+const {
+  storeHasFeature,
+  sanitizeLeadScoreRow,
+  sanitizeLeadScoreMessages,
+} = require("../plans/planEntitlements");
 
 /**
  * GET /api/stores/:storeId/chat-sessions
@@ -76,7 +81,10 @@ function listChatSessions(req, res) {
       )
       .all(...params);
 
-    return res.status(200).json({ data: rows });
+    const allowLeadScoring = storeHasFeature(storeId, "lead_scoring");
+    const data = rows.map((row) => sanitizeLeadScoreRow(row, allowLeadScoring));
+
+    return res.status(200).json({ data });
   } catch (error) {
     return res.status(500).json({
       message: "Could not list chat sessions.",
@@ -126,22 +134,27 @@ function getChatSessionDetail(req, res) {
       return res.status(404).json({ message: "Chat session not found." });
     }
 
-    const messages = db
-      .prepare(
-        `
+    const allowLeadScoring = storeHasFeature(storeId, "lead_scoring");
+
+    const messages = sanitizeLeadScoreMessages(
+      db
+        .prepare(
+          `
           SELECT id, session_id, sender_type, message_text, intent, payload, created_at
           FROM chat_messages
           WHERE session_id = ?
           ORDER BY id ASC
           LIMIT 500
         `
-      )
-      .all(sessionId)
-      .map((row) => attachLeadPayloadToMessageRow(row));
+        )
+        .all(sessionId)
+        .map((row) => attachLeadPayloadToMessageRow(row)),
+      allowLeadScoring
+    );
 
     return res.status(200).json({
       data: {
-        session,
+        session: sanitizeLeadScoreRow(session, allowLeadScoring),
         messages,
       },
     });
@@ -216,7 +229,11 @@ function setChatSessionTakeover(req, res) {
       )
       .get(sessionId, storeId);
 
-    return res.status(200).json({ data: { session } });
+    const allowLeadScoring = storeHasFeature(storeId, "lead_scoring");
+
+    return res.status(200).json({
+      data: { session: sanitizeLeadScoreRow(session, allowLeadScoring) },
+    });
   } catch (error) {
     return res.status(500).json({
       message: "Could not update takeover state.",
@@ -280,18 +297,23 @@ function postOwnerChatMessage(req, res) {
       `
     ).run(sessionId);
 
-    const messages = db
-      .prepare(
-        `
+    const allowLeadScoring = storeHasFeature(storeId, "lead_scoring");
+
+    const messages = sanitizeLeadScoreMessages(
+      db
+        .prepare(
+          `
           SELECT id, session_id, sender_type, message_text, intent, payload, created_at
           FROM chat_messages
           WHERE session_id = ?
           ORDER BY id ASC
           LIMIT 500
         `
-      )
-      .all(sessionId)
-      .map((row) => attachLeadPayloadToMessageRow(row));
+        )
+        .all(sessionId)
+        .map((row) => attachLeadPayloadToMessageRow(row)),
+      allowLeadScoring
+    );
 
     return res.status(201).json({
       message: "Message sent.",
