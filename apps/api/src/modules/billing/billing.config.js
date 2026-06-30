@@ -1,6 +1,12 @@
 const { hasConfiguredStripePrices } = require("../plans/planMatrix");
 
+function isManualBillingMode() {
+  const raw = String(process.env.MANUAL_BILLING_ENFORCED || "").trim().toLowerCase();
+  return raw === "true" || raw === "1" || raw === "yes";
+}
+
 function isBillingEnforced() {
+  if (isManualBillingMode()) return true;
   const secret =
     process.env.STRIPE_SECRET_KEY && String(process.env.STRIPE_SECRET_KEY).trim();
   if (!secret) return false;
@@ -16,6 +22,7 @@ function getFrontendBaseUrl() {
 }
 
 module.exports = {
+  isManualBillingMode,
   isBillingEnforced,
   getFrontendBaseUrl,
 };

@@ -100,6 +100,10 @@ export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStor
   }
 
   const selectedPlan = PLAN_CATALOG.find((p) => p.id === checkoutPlan) || PLAN_CATALOG[1];
+  const manualBilling = Boolean(billingStatus?.manual_billing);
+  const manualPaymentNote =
+    String(import.meta.env.VITE_MANUAL_PAYMENT_INSTRUCTIONS || "").trim() ||
+    "حوّل قيمة الاشتراك إلى الحساب البنكي المتفق عليه، ثم أرسل إثبات التحويل (لقطة شاشة أو رقم العملية) عبر واتساب أو البريد. سيتم تفعيل خطتك من إدارة المنصة خلال ساعات العمل.";
 
   return (
     <div className="owner-upgrade" dir="rtl">
@@ -114,6 +118,12 @@ export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStor
             التجربة المجانية (7 أيام) تعطيك نفس حدود Starter مع 1,000 رسالة AI شهريًا.
           </p>
           <p className="owner-upgrade__sub">{subline}</p>
+          {manualBilling ? (
+            <p className="owner-upgrade__manual-note" role="status">
+              الدفع حالياً <strong>تحويل بنكي</strong> وليس عبر Stripe. اختر الخطة المناسبة أدناه، نفّذ
+              التحويل، ثم تواصل معنا — نفعّل اشتراكك من لوحة الإدارة.
+            </p>
+          ) : null}
           <div className="owner-upgrade__plans" role="group" aria-label="اختر الخطة">
             {PLAN_CATALOG.map((card) => {
               const selected = checkoutPlan === card.id;
@@ -140,17 +150,28 @@ export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStor
             })}
           </div>
           <div className="owner-upgrade__cta-row">
-            <button
-              type="button"
-              className="owner-upgrade__btn owner-upgrade__btn--primary owner-upgrade__btn--pulse"
-              disabled={checkoutLoading}
-              onClick={handleCheckout}
-            >
-              {checkoutLoading ? "جاري التحويل…" : `فعّل ${selectedPlan.title} الآن`}
-            </button>
-            <button type="button" className="owner-upgrade__btn owner-upgrade__btn--ghost" onClick={onPreviewStore}>
-              معاينة المتجر كزائر
-            </button>
+            {manualBilling ? (
+              <div className="owner-upgrade__manual-box">
+                <p className="owner-upgrade__manual-box-title">
+                  لتفعيل {selectedPlan.title} ({selectedPlan.price}/شهر)
+                </p>
+                <p className="owner-upgrade__manual-box-text">{manualPaymentNote}</p>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="owner-upgrade__btn owner-upgrade__btn--primary owner-upgrade__btn--pulse"
+                  disabled={checkoutLoading}
+                  onClick={handleCheckout}
+                >
+                  {checkoutLoading ? "جاري التحويل…" : `فعّل ${selectedPlan.title} الآن`}
+                </button>
+                <button type="button" className="owner-upgrade__btn owner-upgrade__btn--ghost" onClick={onPreviewStore}>
+                  معاينة المتجر كزائر
+                </button>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -200,13 +221,17 @@ export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStor
       </section>
 
       <section className="owner-upgrade__trust" aria-label="ثقة وأمان">
-        <h2 className="owner-upgrade__section-title">دفع آمن عبر Stripe</h2>
+        <h2 className="owner-upgrade__section-title">
+          {manualBilling ? "تفعيل يدوي بعد التحويل" : "دفع آمن عبر Stripe"}
+        </h2>
         <p className="owner-upgrade__trust-text">
-          تتم إدارة الاشتراك عبر Stripe: بوابة دفع معروفة، فواتير واضحة، وإمكانية إدارة
-          الفوترة لاحقًا من حسابك بعد التفعيل.
+          {manualBilling
+            ? "بعد تأكيد التحويل البنكي، تُفعَّل خطتك يدوياً من إدارة المنصة. ستظهر الميزات (مثل المحادثات) فور تحديث حالة اشتراكك."
+            : "تتم إدارة الاشتراك عبر Stripe: بوابة دفع معروفة، فواتير واضحة، وإمكانية إدارة الفوترة لاحقًا من حسابك بعد التفعيل."}
         </p>
       </section>
 
+      {!manualBilling ? (
       <section className="owner-upgrade__footer-cta">
         <p>جاهز لتقليل الفرص الضائعة؟</p>
         <button
@@ -218,6 +243,7 @@ export function OwnerUpgradePage({ billingStatus, onStartCheckout, onPreviewStor
           {checkoutLoading ? "جاري التحويل…" : `ابدأ ${selectedPlan.title}`}
         </button>
       </section>
+      ) : null}
     </div>
   );
 }

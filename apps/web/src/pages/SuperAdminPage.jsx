@@ -4,6 +4,21 @@ import { buildPublicStorefrontUrl } from "../lib/storefrontUrl";
 import "./SuperAdminPage.css";
 
 const STATUS_OPTIONS = ["active", "trial", "suspended", "trialing", "past_due", "unpaid"];
+const TIER_OPTIONS = [
+  { value: "trial", label: "trial — تجربة مجانية" },
+  { value: "starter", label: "starter — أساسي" },
+  { value: "growth", label: "growth — محادثات + تحليلات" },
+  { value: "pro", label: "pro — كامل" },
+];
+
+const STATUS_HINTS = {
+  trial: "تجربة مجانية — يحتاج trial_ends_at مستقبلي",
+  active: "مدفوع / مفعّل — استخدم مع الخطة المختارة",
+  suspended: "موقوف — لا يدخل لوحة التحكم",
+  trialing: "مثل active (للاستخدام مع Stripe لاحقاً)",
+  past_due: "متأخر بالدفع — محجوب",
+  unpaid: "غير مدفوع — محجوب",
+};
 
 export function SuperAdminPage({ onExit }) {
   const [stores, setStores] = useState([]);
@@ -71,6 +86,11 @@ export function SuperAdminPage({ onExit }) {
           <p className="super-admin__sub">
             {loading ? "جاري التحميل…" : `${stores.length} من أصل ${total} متجرًا`}
           </p>
+          <p className="super-admin__hint">
+            <strong>تحويل بنكي:</strong> بعد استلام الدفع، اضبط <em>الخطة</em> (growth/pro) ثم{" "}
+            <em>الحالة</em> = active. للتجربة المجانية: الحالة = trial + تمديد التجربة. للإيقاف:
+            suspended.
+          </p>
         </div>
         <div className="super-admin__header-actions">
           <button type="button" className="dm-btn dm-btn--secondary" onClick={load} disabled={loading}>
@@ -97,6 +117,7 @@ export function SuperAdminPage({ onExit }) {
               <th>السلج</th>
               <th>البريد</th>
               <th>الحالة</th>
+              <th>الخطة</th>
               <th>نهاية التجربة</th>
               <th>إجراءات</th>
             </tr>
@@ -123,12 +144,21 @@ export function SuperAdminPage({ onExit }) {
 
 function StoreRow({ store, busy, msg, onPatch }) {
   const [status, setStatus] = useState(store.subscription_status || "active");
+  const [planTier, setPlanTier] = useState(store.plan_tier || "trial");
   const [extendDays, setExtendDays] = useState("7");
   const publicUrl = store.slug ? buildPublicStorefrontUrl(store.slug) : "";
 
   useEffect(() => {
     setStatus(store.subscription_status || "active");
   }, [store.subscription_status]);
+
+  useEffect(() => {
+    setPlanTier(store.plan_tier || "trial");
+  }, [store.plan_tier]);
+
+  const statusChanged = status !== (store.subscription_status || "active");
+  const tierChanged = planTier !== (store.plan_tier || "trial");
+  const canSave = statusChanged || tierChanged;
 
   return (
     <tr>
@@ -151,10 +181,25 @@ function StoreRow({ store, busy, msg, onPatch }) {
           value={status}
           onChange={(e) => setStatus(e.target.value)}
           disabled={busy}
+          title={STATUS_HINTS[status] || ""}
         >
           {STATUS_OPTIONS.map((opt) => (
-            <option key={opt} value={opt}>
+            <option key={opt} value={opt} title={STATUS_HINTS[opt] || ""}>
               {opt}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td>
+        <select
+          className="super-admin__select"
+          value={planTier}
+          onChange={(e) => setPlanTier(e.target.value)}
+          disabled={busy}
+        >
+          {TIER_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
             </option>
           ))}
         </select>
@@ -167,10 +212,15 @@ function StoreRow({ store, busy, msg, onPatch }) {
           <button
             type="button"
             className="dm-btn dm-btn--primary dm-btn--sm"
-            disabled={busy || status === store.subscription_status}
-            onClick={() => onPatch({ subscription_status: status })}
+            disabled={busy || !canSave}
+            onClick={() =>
+              onPatch({
+                ...(statusChanged ? { subscription_status: status } : {}),
+                ...(tierChanged ? { plan_tier: planTier } : {}),
+              })
+            }
           >
-            حفظ الحالة
+            حفظ
           </button>
           <div className="super-admin__extend">
             <input

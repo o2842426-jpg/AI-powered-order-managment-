@@ -2,6 +2,7 @@ const Stripe = require("stripe");
 const { db } = require("../../db/client");
 const {
   isBillingEnforced,
+  isManualBillingMode,
   getFrontendBaseUrl,
 } = require("./billing.config");
 const { isDemoTrialStore } = require("./billing.demoOverride");
@@ -86,6 +87,7 @@ function getBillingStatus(req, res) {
         ai_messages_monthly_limit: aiLimit,
         capabilities: getCapabilitiesForTier(effectiveTier),
         demo_trial_enforced: isDemoTrialStore(req.user.store_id),
+        manual_billing: isManualBillingMode(),
       },
     });
   } catch (error) {
@@ -160,6 +162,14 @@ function getEntitlements(req, res) {
 
 async function createCheckoutSession(req, res) {
   try {
+    if (isManualBillingMode()) {
+      return res.status(400).json({
+        code: "MANUAL_BILLING",
+        message:
+          "الدفع يدوي حالياً (تحويل بنكي). بعد التحويل تواصل مع إدارة المنصة لتفعيل اشتراكك.",
+      });
+    }
+
     if (!isBillingEnforced()) {
       return res.status(400).json({
         message: "Billing is not configured on the server.",
@@ -218,6 +228,13 @@ async function createCheckoutSession(req, res) {
 
 async function createPortalSession(req, res) {
   try {
+    if (isManualBillingMode()) {
+      return res.status(400).json({
+        code: "MANUAL_BILLING",
+        message: "إدارة الاشتراك تتم يدوياً. تواصل مع إدارة المنصة لأي تغيير على خطتك.",
+      });
+    }
+
     if (!isBillingEnforced()) {
       return res.status(400).json({
         message: "Billing is not configured on the server.",

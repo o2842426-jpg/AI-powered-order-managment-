@@ -296,7 +296,8 @@ function App() {
     ownerAuth &&
     billingStatus?.billing_enforced &&
     billingStatus?.has_access &&
-    billingStatus?.can_use_portal ? (
+    billingStatus?.can_use_portal &&
+    !billingStatus?.manual_billing ? (
       <div className="app-billing-ok app-billing-ok--shell">
         <button type="button" className="app-billing-link" onClick={openBillingPortal}>
           إدارة الفوترة
@@ -507,7 +508,8 @@ function App() {
           {ownerAuth &&
             billingStatus?.billing_enforced &&
             billingStatus?.has_access &&
-            billingStatus?.can_use_portal && (
+            billingStatus?.can_use_portal &&
+            !billingStatus?.manual_billing && (
               <div className="app-billing-ok">
                 <button type="button" className="app-billing-link" onClick={openBillingPortal}>
                   إدارة الفوترة

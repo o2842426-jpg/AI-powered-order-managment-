@@ -1,4 +1,5 @@
 const { db } = require("../../db/client");
+const { normalizePlanTier } = require("../plans/planMatrix");
 
 const ALLOWED_SUBSCRIPTION_STATUSES = new Set([
   "active",
@@ -25,6 +26,7 @@ function listStores(req, res) {
             s.slug,
             s.phone,
             s.subscription_status,
+            s.plan_tier,
             s.trial_started_at,
             s.trial_ends_at,
             s.subscription_current_period_end,
@@ -76,6 +78,7 @@ function patchStore(req, res) {
           SELECT
             id,
             subscription_status,
+            plan_tier,
             trial_started_at,
             trial_ends_at,
             stripe_customer_id,
@@ -100,6 +103,12 @@ function patchStore(req, res) {
         });
       }
       nextStatus = candidate;
+    }
+
+    let nextPlanTier = normalizePlanTier(row.plan_tier);
+    if (body.plan_tier != null && String(body.plan_tier).trim() !== "") {
+      const candidate = normalizePlanTier(body.plan_tier);
+      nextPlanTier = candidate;
     }
 
     let trialStartedAt = row.trial_started_at;
@@ -140,6 +149,7 @@ function patchStore(req, res) {
         UPDATE stores
         SET
           subscription_status = ?,
+          plan_tier = ?,
           trial_started_at = ?,
           trial_ends_at = ?,
           stripe_customer_id = ?,
@@ -148,6 +158,7 @@ function patchStore(req, res) {
       `
     ).run(
       nextStatus,
+      nextPlanTier,
       trialStartedAt ?? null,
       trialEndsAt ?? null,
       stripeCustomerId,
@@ -163,6 +174,7 @@ function patchStore(req, res) {
             name,
             slug,
             subscription_status,
+            plan_tier,
             trial_started_at,
             trial_ends_at,
             subscription_current_period_end,

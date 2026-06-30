@@ -25,6 +25,19 @@
   color: var(--dm-color-text-muted, #6b7280);
 }
 
+.super-admin__hint {
+  margin: 0.65rem 0 0;
+  max-width: 52rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--dm-color-text-muted, #6b7280);
+}
+
+.super-admin__hint em {
+  font-style: normal;
+  font-weight: 600;
+}
+
 .super-admin__header-actions {
   display: flex;
   flex-wrap: wrap;

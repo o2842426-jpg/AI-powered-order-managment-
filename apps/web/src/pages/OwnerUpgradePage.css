@@ -167,6 +167,36 @@
   align-items: center;
 }
 
+.owner-upgrade__manual-note {
+  margin: 0 0 var(--dm-space-3);
+  padding: var(--dm-space-2) var(--dm-space-3);
+  border-radius: var(--dm-radius-md, 12px);
+  background: rgba(109, 94, 249, 0.08);
+  border: 1px solid rgba(109, 94, 249, 0.2);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.owner-upgrade__manual-box {
+  flex: 1 1 100%;
+  padding: var(--dm-space-3);
+  border-radius: var(--dm-radius-md, 12px);
+  background: #fff;
+  border: 1px dashed var(--dm-color-border, #e8e8ef);
+}
+
+.owner-upgrade__manual-box-title {
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+}
+
+.owner-upgrade__manual-box-text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--dm-color-text-muted, #6b7280);
+}
+
 .owner-upgrade__btn {
   display: inline-flex;
   align-items: center;
