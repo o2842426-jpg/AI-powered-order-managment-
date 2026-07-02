@@ -4,6 +4,31 @@ const FALLBACK_REPLY = "تم استلام رسالتك، وسيتم الرد ق�
 const MAX_HISTORY_MESSAGES = 8;
 const MAX_RECOMMENDED_IDS = 6;
 
+function looksLikeJsonBlob(text) {
+  const t = String(text || "").trim();
+  if (!t) return false;
+  if (t === "{}" || t === "[]") return true;
+  return (t.startsWith("{") && t.endsWith("}")) || (t.startsWith("[") && t.endsWith("]"));
+}
+
+/**
+ * @param {{ phase?: string, checkoutContext?: { missing?: string[] } }} [opts]
+ */
+function buildSafeCustomerReply(rawReply, opts = {}) {
+  const reply = String(rawReply || "").trim();
+  if (reply && !looksLikeJsonBlob(reply)) {
+    return reply;
+  }
+
+  const missing = opts.checkoutContext?.missing || [];
+  if (opts.phase === "checkout" && missing.length) {
+    const ask = missing.slice(0, 2).join(" و");
+    return `تمام عيني، بقي نثبت الطلب — دزلي ${ask}.`;
+  }
+
+  return FALLBACK_REPLY;
+}
+
 function normalizeCatalogCurrency(code) {
   const c = String(code ?? "SAR")
     .trim()
@@ -335,7 +360,7 @@ function buildFollowupsBlock(rows) {
  * @returns {{ reply: string, recommended_product_ids: number[], image_match_confidence?: string, needs_human_handoff?: boolean }}
  */
 function parseAiChatEnvelope(raw, allowedProductIds, options = {}) {
-  const { visionMode = false } = options;
+  const { visionMode = false, phase, checkoutContext } = options;
   const text = String(raw || "").trim();
   if (!text) {
     return { reply: FALLBACK_REPLY, recommended_product_ids: [] };
@@ -357,12 +382,21 @@ function parseAiChatEnvelope(raw, allowedProductIds, options = {}) {
     }
   }
 
-  if (!obj || typeof obj !== "object") {
-    return { reply: text, recommended_product_ids: [] };
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
+    return {
+      reply: buildSafeCustomerReply(text, { phase, checkoutContext }),
+      recommended_product_ids: [],
+    };
   }
 
   let reply =
-    typeof obj.reply === "string" && obj.reply.trim() ? obj.reply.trim() : text;
+    typeof obj.reply === "string" && obj.reply.trim()
+      ? obj.reply.trim()
+      : looksLikeJsonBlob(text)
+        ? ""
+        : text;
+
+  reply = buildSafeCustomerReply(reply, { phase, checkoutContext });
 
   const confidence = String(obj.image_match_confidence || "").trim().toLowerCase();
   const needsHandoff = obj.needs_human_handoff === true;
@@ -543,7 +577,11 @@ ${catalogText}`,
     });
 
     const raw = response.choices[0]?.message?.content?.trim() || "";
-    return parseAiChatEnvelope(raw, allowedProductIds, { visionMode });
+    return parseAiChatEnvelope(raw, allowedProductIds, {
+      visionMode,
+      phase,
+      checkoutContext,
+    });
   } catch (err) {
     console.error("[ai] OpenAI chat.completions failed:", err?.message || err);
     return { reply: FALLBACK_REPLY, recommended_product_ids: [] };
@@ -556,6 +594,7 @@ module.exports = {
   resolveVisionModel,
   resolveSalesMode,
   parseAiChatEnvelope,
+  buildSafeCustomerReply,
   buildCatalogText,
   buildUserMessageContent,
   EMERGENCY_HANDOFF_REPLY,

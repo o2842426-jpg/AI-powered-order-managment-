@@ -1,5 +1,5 @@
 const { db } = require("../../db/client");
-const { generateStoreChatReply } = require("../ai/ai.service");
+const { generateStoreChatReply, buildSafeCustomerReply } = require("../ai/ai.service");
 const { hasOwnerToolAccess, ownerAccessReason } = require("../billing/billing.access");
 const { shouldEnforcePlansForStore } = require("../billing/billing.demoOverride");
 const { getStorePlanContext } = require("../plans/planEntitlements");
@@ -331,10 +331,16 @@ async function processChannelAiReply({
     recommendedIds = [];
   }
 
-  const replyText =
+  let replyText =
     phase === "checkout"
       ? aiResult.reply
       : appendProductNamesForDm(aiResult.reply, products, recommendedIds);
+
+  replyText = buildSafeCustomerReply(replyText, { phase, checkoutContext });
+  if (!replyText.trim()) {
+    console.warn(`[channel-ai] empty reply blocked conversation=${conversationId}`);
+    return;
+  }
 
   const payload = { recommended_product_ids: recommendedIds };
 
