@@ -1,0 +1,288 @@
+const {
+  getConversationOrderState,
+  saveConversationOrderState,
+} = require("./channel.repository");
+const { ORDER_STATES, IRAQI_GOVERNORATES } = require("./orderState.constants");
+
+const BUY_SIGNALS =
+  /اشتري|أريد\s*اشتري|اريد\s*اشتري|ابي\s*اشتري|أبي\s*اشتري|ثبت|ثبتلي|ثبّت|احجز|كمل|كمّل|كمل\s*الطلب|رتب|اي\s*ثبت|أي\s*ثبت|ابشر\s*ثبت|اوكي\s*اشتري|تمام\s*اشتري/i;
+
+const IMAGE_REQUEST =
+  /صور|صورة|شوفني|ورّيني|وريني|ارسل.*صور|أرسل.*صور|ابعث.*صور/i;
+
+const CITY_PATTERN = new RegExp(
+  `(?:محافظتي|محافظة|عنوان\\s*التوصيل|توصيل\\s*إلى|توصيل\\s*الى|أنا\\s*من|انا\\s*من)\\s*[:\\-]?\\s*(${IRAQI_GOVERNORATES.join("|")})`,
+  "i"
+);
+
+const STANDALONE_CITY = new RegExp(
+  `^\\s*(${IRAQI_GOVERNORATES.join("|")})\\s*$`,
+  "i"
+);
+
+/**
+ * @param {string} text
+ */
+function extractFieldsFromMessage(text) {
+  const t = String(text || "").trim();
+  const patch = {};
+
+  const phoneMatch = t.match(/\b(07\d{9})\b/) || t.match(/\b(\+9647\d{9})\b/);
+  if (phoneMatch) {
+    patch.customer_phone = phoneMatch[1].replace(/^\+964/, "0");
+  }
+
+  const cityMatch = t.match(CITY_PATTERN) || t.match(STANDALONE_CITY);
+  if (cityMatch) {
+    patch.customer_city = normalizeCity(cityMatch[1]);
+  }
+
+  if (/كاش\s*عند\s*الاستلام|الدفع\s*كاش|دفع\s*عند\s*الاستلام/i.test(t)) {
+    patch.payment_method = "cash_on_delivery";
+  }
+
+  const nameMatch = t.match(/(?:اسمي|أنا)\s+([^\n،,.]{4,60})/i);
+  if (nameMatch) {
+    patch.customer_name = nameMatch[1].trim();
+  }
+
+  const addressMatch = t.match(
+    /(?:عنواني|العنوان|عنوان\s*التوصيل)\s*[:\-]?\s*([^\n]{5,120})/i
+  );
+  if (addressMatch) {
+    patch.customer_address = addressMatch[1].trim();
+  }
+
+  if (BUY_SIGNALS.test(t)) {
+    patch.buy_confirmed = true;
+  }
+
+  return patch;
+}
+
+function normalizeCity(raw) {
+  const c = String(raw || "").trim();
+  if (/موصل/i.test(c)) return "الموصل";
+  if (/اربيل/i.test(c)) return "أربيل";
+  if (/انبار/i.test(c)) return "الأنبار";
+  if (/سليمان/i.test(c)) return "السليمانية";
+  return c;
+}
+
+/**
+ * @param {object} row
+ */
+function computeOrderState(row) {
+  const hasProduct = Boolean(row.order_product_id || row.order_product_name);
+  const hasLocation = Boolean(row.customer_city || row.customer_address);
+  const hasPhone = Boolean(row.customer_phone);
+  const buyCommitted = Boolean(row.buy_committed);
+
+  if (!hasProduct || !buyCommitted) {
+    return ORDER_STATES.AWAITING_PRODUCT;
+  }
+  if (!hasLocation) {
+    return ORDER_STATES.AWAITING_LOCATION;
+  }
+  if (!hasPhone) {
+    return ORDER_STATES.AWAITING_PHONE;
+  }
+  return ORDER_STATES.CONFIRMED_AWAITING_FINALIZE;
+}
+
+/**
+ * @param {{ sender_type?: string, message_text?: string, payload?: string }[]} history
+ * @param {object[]} products
+ */
+function inferProductFromThread(history, products) {
+  const aiLines = (history || [])
+    .filter((m) => m.sender_type === "ai")
+    .map((m) => String(m.message_text || ""))
+    .join("\n");
+
+  for (const product of products || []) {
+    const name = String(product.name || "").trim();
+    if (name && aiLines.includes(name)) {
+      return { order_product_id: Number(product.id), order_product_name: name };
+    }
+  }
+
+  for (const msg of history || []) {
+    if (msg.sender_type !== "ai" || !msg.payload) continue;
+    try {
+      const payload =
+        typeof msg.payload === "string" ? JSON.parse(msg.payload) : msg.payload;
+      const ids = payload?.recommended_product_ids;
+      if (Array.isArray(ids) && ids.length) {
+        const pid = Number(ids[0]);
+        const product = (products || []).find((p) => Number(p.id) === pid);
+        if (product) {
+          return {
+            order_product_id: pid,
+            order_product_name: String(product.name || "").trim(),
+          };
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return {};
+}
+
+/**
+ * Backfill missing fields from recent thread (handles pre-migration conversations).
+ *
+ * @param {object} row
+ * @param {{ message_text?: string }[]} history
+ */
+function enrichOrderStateFromHistory(row, history, products = []) {
+  const merged = { ...row };
+  const lines = (history || []).map((m) => String(m.message_text || ""));
+
+  for (const line of lines) {
+    const extracted = extractFieldsFromMessage(line);
+    if (!merged.customer_phone && extracted.customer_phone) {
+      merged.customer_phone = extracted.customer_phone;
+    }
+    if (!merged.customer_city && extracted.customer_city) {
+      merged.customer_city = extracted.customer_city;
+    }
+    if (!merged.customer_name && extracted.customer_name) {
+      merged.customer_name = extracted.customer_name;
+    }
+    if (!merged.customer_address && extracted.customer_address) {
+      merged.customer_address = extracted.customer_address;
+    }
+    if (!merged.payment_method && extracted.payment_method) {
+      merged.payment_method = extracted.payment_method;
+    }
+    if (extracted.buy_confirmed) {
+      merged.buy_committed = 1;
+    }
+  }
+
+  if (!merged.buy_committed && BUY_SIGNALS.test(lines.join("\n"))) {
+    merged.buy_committed = 1;
+  }
+
+  if (merged.buy_committed && !merged.order_product_name) {
+    Object.assign(merged, inferProductFromThread(history, products));
+  }
+
+  return merged;
+}
+  const current = getConversationOrderState(conversationId);
+  let merged = enrichOrderStateFromHistory(current, history, products);
+  const extracted = extractFieldsFromMessage(inboundText);
+  const patch = { ...extracted };
+
+  const historyText = (history || [])
+    .map((m) => String(m.message_text || ""))
+    .join("\n");
+
+  if (
+    patch.buy_confirmed ||
+    extracted.customer_city ||
+    extracted.customer_phone ||
+    BUY_SIGNALS.test(historyText)
+  ) {
+    Object.assign(merged, inferProductFromThread(history, products));
+  }
+
+  if (patch.buy_confirmed || BUY_SIGNALS.test(String(inboundText || ""))) {
+    patch.buy_committed = 1;
+  }
+
+  merged = {
+    ...merged,
+    ...patch,
+  };
+
+  delete merged.buy_confirmed;
+
+  merged.order_state = computeOrderState(merged);
+  saveConversationOrderState(conversationId, merged);
+function syncOrderStateAfterInbound(conversationId, inboundText, history, products) {
+ * unless customer explicitly asks for photos.
+ *
+ * @param {{ sender_type?: string, message_text?: string, message_type?: string, payload?: string }[]} history
+ * @param {string} currentText
+ * @param {string} orderState
+ */
+function shouldAttachProductImages(history, currentText, orderState) {
+  if (IMAGE_REQUEST.test(String(currentText || ""))) {
+    return true;
+  }
+
+  if (orderState && orderState !== ORDER_STATES.AWAITING_PRODUCT) {
+    return false;
+  }
+
+  const recent = (history || []).slice(-6);
+  return !recent.some((m) => {
+    if (m.message_type === "image") return true;
+    const text = String(m.message_text || "").trim();
+    if (/^\[\d+\s*صور منتج\]$/.test(text)) return true;
+    try {
+      const payload =
+        typeof m.payload === "string" ? JSON.parse(m.payload) : m.payload;
+      return Boolean(payload?.image_urls?.length);
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
+ * @param {object} orderState
+ */
+function orderStateToCheckoutContext(orderState) {
+  const missing = [];
+  if (!orderState.customer_name) missing.push("الاسم الثلاثي");
+  if (!orderState.customer_phone) missing.push("رقم الهاتف");
+  if (!orderState.customer_city && !orderState.customer_address) {
+    missing.push("المحافظة والعنوان التفصيلي");
+  } else if (!orderState.customer_address) {
+    missing.push("العنوان التفصيلي (حي/شارع/أقرب نقطة)");
+  }
+  if (!orderState.payment_method) {
+    missing.push("طريقة الدفع (كاش عند الاستلام)");
+  }
+
+  return {
+    has: {
+      confirmed_buy: orderState.order_state !== ORDER_STATES.AWAITING_PRODUCT,
+      governorate: Boolean(orderState.customer_city),
+      address: Boolean(orderState.customer_address),
+      phone: Boolean(orderState.customer_phone),
+      name: Boolean(orderState.customer_name),
+      payment_cod: orderState.payment_method === "cash_on_delivery",
+    },
+    missing,
+  };
+}
+
+/**
+ * @param {string} orderState
+ */
+function orderStateToConversationPhase(orderState) {
+  if (!orderState || orderState === ORDER_STATES.AWAITING_PRODUCT) {
+    return "discovery";
+  }
+  return "checkout";
+}
+
+module.exports = {
+  ORDER_STATES,
+  extractFieldsFromMessage,
+  computeOrderState,
+  inferProductFromThread,
+  enrichOrderStateFromHistory,
+  syncOrderStateAfterInbound,
+  shouldAttachProductImages,
+  orderStateToCheckoutContext,
+  orderStateToConversationPhase,
+  BUY_SIGNALS,
+};

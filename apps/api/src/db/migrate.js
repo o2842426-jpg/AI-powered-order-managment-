@@ -22,6 +22,7 @@ function migrate(db) {
   ensureChatSessionLeadScoreColumns(db);
   ensureWebhookEventsTable(db);
   ensureChannelTables(db);
+  ensureChannelOrderStateColumns(db);
   ensureProductImagesTable(db);
 }
 
@@ -355,6 +356,29 @@ function ensureChatSessionLeadScoreColumns(db) {
   }
   if (!names.has("lead_scored_at")) {
     db.exec("ALTER TABLE chat_sessions ADD COLUMN lead_scored_at TEXT");
+  }
+}
+
+function ensureChannelOrderStateColumns(db) {
+  const columns = db.prepare("PRAGMA table_info(channel_conversations)").all();
+  const names = new Set(columns.map((c) => c.name));
+
+  const additions = [
+    ["order_state", "TEXT NOT NULL DEFAULT 'AWAITING_PRODUCT'"],
+    ["order_product_id", "INTEGER"],
+    ["order_product_name", "TEXT"],
+    ["customer_city", "TEXT"],
+    ["customer_phone", "TEXT"],
+    ["customer_name", "TEXT"],
+    ["customer_address", "TEXT"],
+    ["payment_method", "TEXT"],
+    ["buy_committed", "INTEGER NOT NULL DEFAULT 0"],
+  ];
+
+  for (const [name, ddl] of additions) {
+    if (!names.has(name)) {
+      db.exec(`ALTER TABLE channel_conversations ADD COLUMN ${name} ${ddl}`);
+    }
   }
 }
 

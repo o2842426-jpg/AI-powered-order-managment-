@@ -20,6 +20,7 @@ const {
   getConversationById,
   listChannelMessagesForAi,
   insertOutboundChannelMessage,
+  saveConversationOrderState,
 } = require("./channel.repository");
 const { resolvePublicMediaUrl } = require("../../lib/publicMediaUrl");
 const {
@@ -27,10 +28,14 @@ const {
   MAX_DM_IMAGES_PER_MESSAGE,
 } = require("../../lib/productImages");
 const {
-  detectConversationPhase,
-  productImagesAlreadySent,
-  summarizeCheckoutContext,
-} = require("./conversationPhase");
+  ORDER_STATES,
+  syncOrderStateAfterInbound,
+  shouldAttachProductImages,
+  orderStateToCheckoutContext,
+  orderStateToConversationPhase,
+  computeOrderState,
+} = require("./orderState.service");
+const { buildDynamicOrderStateBlock } = require("./dynamicOrderPrompt");
 
 /**
  * Append product names only — no store URLs (Instagram DM stays in-chat).
@@ -246,7 +251,7 @@ async function processChannelAiReply({
     !enforcePlans || tierMeetsFeature(tier, "ai_followups");
 
   const products = loadActiveProductCatalog(store.id);
-  const history = listChannelMessagesForAi(conversationId, 8);
+  const history = listChannelMessagesForAi(conversationId, 10);
 
   let priorHistory = history;
   let currentText = inboundText;
@@ -302,12 +307,23 @@ async function processChannelAiReply({
   }
 
   const fullHistory = history;
-  const phase = detectConversationPhase(fullHistory, currentText);
-  const checkoutContext = summarizeCheckoutContext(fullHistory, currentText);
-  const imagesSent = productImagesAlreadySent(fullHistory);
+  const orderState = syncOrderStateAfterInbound(
+    conversationId,
+    currentText,
+    fullHistory,
+    products
+  );
+  const phase = orderStateToConversationPhase(orderState.order_state);
+  const checkoutContext = orderStateToCheckoutContext(orderState);
+  const orderStateBlock = buildDynamicOrderStateBlock(orderState);
+  const attachImages = shouldAttachProductImages(
+    fullHistory,
+    currentText,
+    orderState.order_state
+  );
 
   console.info(
-    `[channel-ai] phase=${phase} imagesSent=${imagesSent} missing=${checkoutContext.missing.join("|") || "none"}`
+    `[channel-ai] order_state=${orderState.order_state} attachImages=${attachImages} missing=${checkoutContext.missing.join("|") || "none"}`
   );
 
   const aiResult = await generateStoreChatReply({
@@ -321,14 +337,35 @@ async function processChannelAiReply({
     customerImageUrls: imageUrls,
     conversationPhase: phase,
     checkoutContext,
+    orderStateBlock,
   });
 
   let recommendedIds = Array.isArray(aiResult.recommended_product_ids)
     ? aiResult.recommended_product_ids
     : [];
 
-  if (phase === "checkout" || imagesSent) {
+  if (phase === "checkout" || !attachImages) {
     recommendedIds = [];
+  }
+
+  if (
+    recommendedIds.length &&
+    orderState.order_state === ORDER_STATES.AWAITING_PRODUCT
+  ) {
+    const product = products.find(
+      (p) => Number(p.id) === Number(recommendedIds[0])
+    );
+    if (product) {
+      saveConversationOrderState(conversationId, {
+        order_product_id: Number(product.id),
+        order_product_name: String(product.name || "").trim(),
+        order_state: computeOrderState({
+          ...orderState,
+          order_product_id: Number(product.id),
+          order_product_name: String(product.name || "").trim(),
+        }),
+      });
+    }
   }
 
   let replyText =
@@ -380,10 +417,9 @@ async function processChannelAiReply({
     payload,
   });
 
-  const productImageUrls =
-    phase === "checkout" || imagesSent
-      ? []
-      : collectDmProductImageUrls(products, recommendedIds);
+  const productImageUrls = attachImages
+    ? collectDmProductImageUrls(products, recommendedIds)
+    : [];
   if (productImageUrls.length) {
     const imgResult = await sendInstagramImagesWithEncryptedToken({
       connection,

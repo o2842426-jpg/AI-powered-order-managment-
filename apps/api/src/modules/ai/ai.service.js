@@ -1,7 +1,7 @@
 const OpenAI = require("openai");
 
 const FALLBACK_REPLY = "تم استلام رسالتك، وسيتم الرد قريبًا.";
-const MAX_HISTORY_MESSAGES = 8;
+const MAX_HISTORY_MESSAGES = 10;
 const MAX_RECOMMENDED_IDS = 6;
 
 function looksLikeJsonBlob(text) {
@@ -469,6 +469,7 @@ async function generateStoreChatReply({
   customerImageUrls = [],
   conversationPhase = "discovery",
   checkoutContext = null,
+  orderStateBlock = "",
 }) {
   const allowedProductIds = new Set(
     (products || []).map((p) => Number(p.id)).filter((n) => Number.isInteger(n) && n > 0)
@@ -487,6 +488,7 @@ async function generateStoreChatReply({
   const salesPlaybook = buildSalesPlaybookBlock(salesMode, phase);
   const checkoutBlock =
     phase === "checkout" ? buildCheckoutProtocolBlock(checkoutContext) : "";
+  const dynamicStateBlock = String(orderStateBlock || "").trim();
   const memoryBlock = buildMemoryFactsBlock(memoryFacts);
   const followupsBlock = buildFollowupsBlock(followups);
   const channelBlock = buildChannelContextBlock(channelContext, salesMode, phase);
@@ -560,7 +562,7 @@ ${jsonInstructions}
 
 ${salesPersona}
 
-${checkoutBlock ? `${checkoutBlock}\n\n` : ""}${salesPlaybook}
+${dynamicStateBlock ? `${dynamicStateBlock}\n\n` : ""}${checkoutBlock ? `${checkoutBlock}\n\n` : ""}${salesPlaybook}
 
 تعليمات صاحب المتجر (ما لم تخالف الكتالوج أو قواعد الإغلاق):
 ${ownerPrompt}${channelBlock ? `\n\n${channelBlock}` : ""}${memoryBlock}${followupsBlock}`,

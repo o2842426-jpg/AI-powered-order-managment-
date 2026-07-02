@@ -317,11 +317,15 @@ function getConversationById(conversationId) {
  * @param {number} [limit]
  * @returns {Array<{ sender_type: string, message_text: string }>}
  */
-function listChannelMessagesForAi(conversationId, limit = 8) {
+function listChannelMessagesForAi(conversationId, limit = 10) {
   return db
     .prepare(
       `
-        SELECT sender_type, body_text AS message_text
+        SELECT
+          sender_type,
+          body_text AS message_text,
+          message_type,
+          payload
         FROM channel_messages
         WHERE conversation_id = ?
         ORDER BY id DESC
@@ -330,6 +334,98 @@ function listChannelMessagesForAi(conversationId, limit = 8) {
     )
     .all(conversationId, limit)
     .reverse();
+}
+
+const DEFAULT_ORDER_STATE = {
+  order_state: "AWAITING_PRODUCT",
+  order_product_id: null,
+  order_product_name: null,
+  customer_city: null,
+  customer_phone: null,
+  customer_name: null,
+  customer_address: null,
+  payment_method: null,
+  buy_committed: 0,
+};
+
+/**
+ * @param {number} conversationId
+ */
+function getConversationOrderState(conversationId) {
+  const row =
+    db
+      .prepare(
+        `
+          SELECT
+            order_state,
+            order_product_id,
+            order_product_name,
+            customer_city,
+            customer_phone,
+            customer_name,
+            customer_address,
+            payment_method,
+            buy_committed
+          FROM channel_conversations
+          WHERE id = ?
+        `
+      )
+      .get(conversationId) || null;
+
+  if (!row) {
+    return { ...DEFAULT_ORDER_STATE };
+  }
+
+  return {
+    order_state: row.order_state || DEFAULT_ORDER_STATE.order_state,
+    order_product_id: row.order_product_id ?? null,
+    order_product_name: row.order_product_name ?? null,
+    customer_city: row.customer_city ?? null,
+    customer_phone: row.customer_phone ?? null,
+    customer_name: row.customer_name ?? null,
+    customer_address: row.customer_address ?? null,
+    payment_method: row.payment_method ?? null,
+    buy_committed: Number(row.buy_committed) ? 1 : 0,
+  };
+}
+
+/**
+ * @param {number} conversationId
+ * @param {object} patch
+ */
+function saveConversationOrderState(conversationId, patch) {
+  const current = getConversationOrderState(conversationId);
+  const next = { ...current, ...patch };
+
+  db.prepare(
+    `
+      UPDATE channel_conversations
+      SET
+        order_state = ?,
+        order_product_id = ?,
+        order_product_name = ?,
+        customer_city = ?,
+        customer_phone = ?,
+        customer_name = ?,
+        customer_address = ?,
+        payment_method = ?,
+        buy_committed = ?
+      WHERE id = ?
+    `
+  ).run(
+    next.order_state || DEFAULT_ORDER_STATE.order_state,
+    next.order_product_id ?? null,
+    next.order_product_name ?? null,
+    next.customer_city ?? null,
+    next.customer_phone ?? null,
+    next.customer_name ?? null,
+    next.customer_address ?? null,
+    next.payment_method ?? null,
+    Number(next.buy_committed) ? 1 : 0,
+    conversationId
+  );
+
+  return next;
 }
 
 /**
@@ -661,6 +757,8 @@ module.exports = {
   getActiveConnectionById,
   getConversationById,
   listChannelMessagesForAi,
+  getConversationOrderState,
+  saveConversationOrderState,
   insertOutboundChannelMessage,
   getChannelConversationForStore,
   updateChannelConversationTakeover,
