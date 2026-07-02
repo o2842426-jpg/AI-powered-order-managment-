@@ -43,6 +43,10 @@ function ensureAiUsageMonth(storeId) {
  * @returns {{ ok: true, used: number, limit: number | null, tier: string } | { ok: false, code: string, message: string, used: number, limit: number | null }}
  */
 function evaluateAiMessageQuota(storeRow) {
+  if (!shouldEnforcePlansForStore(storeRow.id)) {
+    return { ok: true, used: 0, limit: null, tier: "unlimited_dev" };
+  }
+
   ensureAiUsageMonth(storeRow.id);
   const fresh = db
     .prepare(

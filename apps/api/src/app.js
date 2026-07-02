@@ -35,15 +35,18 @@ app.use(
         return callback(null, true);
       }
       if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
+        return callback(null, origin);
       }
       if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-        return callback(null, true);
+        return callback(null, origin);
       }
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
+      console.warn(`[cors] blocked origin: ${origin}`);
+      return callback(null, false);
     },
+    credentials: true,
     methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Admin-Key"],
+    optionsSuccessStatus: 204,
   })
 );
 

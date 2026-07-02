@@ -48,8 +48,11 @@ function handleInstagramWebhookPost(req, res) {
   }
 
   const signatureHeader = req.get("X-Hub-Signature-256");
-  if (!verifyMetaSignature(rawBody, signatureHeader)) {
-    console.warn("[instagram-webhook] rejected POST — invalid or missing signature");
+  const verified = verifyMetaSignature(rawBody, signatureHeader);
+  if (!verified.ok) {
+    console.warn(
+      `[instagram-webhook] rejected POST — ${verified.reason} (bodyBytes=${rawBody.length})`
+    );
     return res.sendStatus(403);
   }
 

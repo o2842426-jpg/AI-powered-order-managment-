@@ -10,6 +10,14 @@ const { app } = require("./app");
 
 const PORT = process.env.PORT || 4000;
 
+const metaSecretOk = Boolean(String(process.env.META_APP_SECRET || "").trim());
+const metaVerifyOk = Boolean(String(process.env.META_VERIFY_TOKEN || "").trim());
+console.info(
+  `[startup] env: META_APP_SECRET=${metaSecretOk ? "set" : "MISSING"}, ` +
+    `META_VERIFY_TOKEN=${metaVerifyOk ? "set" : "MISSING"}, ` +
+    `PORT=${PORT}`
+);
+
 if (!String(process.env.OPENAI_API_KEY || "").trim()) {
   console.warn(
     "[dm-commerce] OPENAI_API_KEY is empty or unset — chat uses the fallback reply. " +

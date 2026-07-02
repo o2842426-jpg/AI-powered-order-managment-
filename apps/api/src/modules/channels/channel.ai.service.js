@@ -81,6 +81,53 @@ function collectDmProductImageUrls(products, recommendedIds) {
   return urls;
 }
 
+const SKIP_NOTICE_MESSAGES = {
+  trial_expired:
+    "عيني، التجربة المجانية للمتجر انتهت حالياً. ثواني وصاحب المتجر راح يكمل وياك — أو تواصل وياه مباشرة.",
+  suspended:
+    "عيني، خدمة الرد التلقائي متوقفة مؤقتاً. راح يتواصل وياك صاحب المتجر بأقرب وقت.",
+  payment_required:
+    "عيني، خدمة الرد التلقائي متوقفة مؤقتاً. راح يتواصل وياك صاحب المتجر بأقرب وقت.",
+  subscription_inactive:
+    "عيني، خدمة الرد التلقائي متوقفة مؤقتاً. راح يتواصل وياك صاحب المتجر بأقرب وقت.",
+  AI_QUOTA_EXCEEDED:
+    "عيني، وصلنا للحد الشهري للردود التلقائية. صاحب المتجر راح يكمل وياك — انتظرني لحظة.",
+};
+
+async function notifyCustomerAiUnavailable({
+  connection,
+  conversationId,
+  storeId,
+  customerIgsid,
+  reason,
+}) {
+  const text =
+    SKIP_NOTICE_MESSAGES[reason] ||
+    "عيني، الرد التلقائي متوقف مؤقتاً. صاحب المتجر راح يكمل وياك قريباً.";
+
+  const sendResult = await sendInstagramTextWithEncryptedToken({
+    connection,
+    recipientIgsid: customerIgsid,
+    text,
+  });
+
+  insertOutboundChannelMessage({
+    conversationId,
+    storeId,
+    mid: sendResult.ok ? sendResult.messageId : null,
+    text,
+    senderType: "system",
+    deliveryStatus: sendResult.ok ? "sent" : "failed",
+    payload: sendResult.ok ? { skip_reason: reason } : { skip_reason: reason, send_error: sendResult.error },
+  });
+
+  if (!sendResult.ok) {
+    console.error(
+      `[channel-ai] skip notice send failed conversation=${conversationId}: ${sendResult.error}`
+    );
+  }
+}
+
 /**
  * Async AI reply pipeline for Instagram DM (phase 4B).
  * Must not block webhook HTTP response.
@@ -102,6 +149,12 @@ async function processChannelAiReply({
   inboundText,
   inboundImageUrls = [],
 }) {
+  const inboundPreview = String(inboundText || "").trim().slice(0, 80);
+  const imageCount = Array.isArray(inboundImageUrls) ? inboundImageUrls.length : 0;
+  console.info(
+    `[channel-ai] start store=${storeId} conversation=${conversationId} text="${inboundPreview}" images=${imageCount}`
+  );
+
   const store = db
     .prepare(
       `
@@ -131,10 +184,24 @@ async function processChannelAiReply({
     return;
   }
 
+  const connection = getActiveConnectionById(connectionId);
+  if (!connection) {
+    console.warn(`[channel-ai] connection missing id=${connectionId}`);
+    return;
+  }
+
   if (!hasOwnerToolAccess(store)) {
-    console.info(
-      `[channel-ai] skip store=${storeId} — billing/access (${ownerAccessReason(store)})`
+    const reason = ownerAccessReason(store);
+    console.warn(
+      `[channel-ai] skip store=${storeId} — billing/access (${reason})`
     );
+    await notifyCustomerAiUnavailable({
+      connection,
+      conversationId,
+      storeId,
+      customerIgsid,
+      reason,
+    });
     return;
   }
 
@@ -153,13 +220,16 @@ async function processChannelAiReply({
 
   const quota = evaluateAiMessageQuota(store);
   if (!quota.ok) {
-    console.info(`[channel-ai] skip store=${storeId} — ${quota.code}`);
-    return;
-  }
-
-  const connection = getActiveConnectionById(connectionId);
-  if (!connection) {
-    console.warn(`[channel-ai] connection missing id=${connectionId}`);
+    console.warn(
+      `[channel-ai] skip store=${storeId} — ${quota.code} used=${quota.used} limit=${quota.limit}`
+    );
+    await notifyCustomerAiUnavailable({
+      connection,
+      conversationId,
+      storeId,
+      customerIgsid,
+      reason: quota.code,
+    });
     return;
   }
 
@@ -183,8 +253,17 @@ async function processChannelAiReply({
     const last = history[history.length - 1];
     if (last.sender_type === "customer") {
       priorHistory = history.slice(0, -1);
-      currentText = last.message_text || inboundText;
+      currentText =
+        String(inboundText || "").trim() ||
+        String(last.message_text || "").trim();
     }
+  }
+
+  if (!String(currentText || "").trim() && !imageUrls.length) {
+    console.warn(
+      `[channel-ai] empty inbound content conversation=${conversationId} — abort`
+    );
+    return;
   }
 
   let memoryFacts = [];
@@ -276,12 +355,12 @@ async function processChannelAiReply({
     payload,
   });
 
-  const imageUrls = collectDmProductImageUrls(products, recommendedIds);
-  if (imageUrls.length) {
+  const productImageUrls = collectDmProductImageUrls(products, recommendedIds);
+  if (productImageUrls.length) {
     const imgResult = await sendInstagramImagesWithEncryptedToken({
       connection,
       recipientIgsid: customerIgsid,
-      imageUrls,
+      imageUrls: productImageUrls,
     });
 
     if (imgResult.ok) {
@@ -289,12 +368,12 @@ async function processChannelAiReply({
         conversationId,
         storeId,
         mid: imgResult.messageId,
-        text: `[${imageUrls.length} صور منتج]`,
+        text: `[${productImageUrls.length} صور منتج]`,
         senderType: "ai",
         deliveryStatus: "sent",
         messageType: "image",
         payload: {
-          image_urls: imageUrls,
+          image_urls: productImageUrls,
           recommended_product_ids: recommendedIds,
         },
       });

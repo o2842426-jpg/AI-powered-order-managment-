@@ -108,6 +108,15 @@ function buildConversationMessages(conversationMessages, messageText, customerIm
   const userContent = buildUserMessageContent(messageText, customerImageUrls);
   if (userContent) {
     mapped.push({ role: "user", content: userContent });
+  } else if (String(messageText || "").trim()) {
+    mapped.push({ role: "user", content: String(messageText).trim() });
+  }
+
+  if (!mapped.length) {
+    mapped.push({
+      role: "user",
+      content: "مرحبا",
+    });
   }
 
   return mapped;

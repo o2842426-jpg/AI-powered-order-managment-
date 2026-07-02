@@ -1,0 +1,46 @@
+# api.shopiq.me — proxy to shopiq-api (PM2 on :4000)
+#
+# Install:
+#   sudo cp infra/nginx/api.shopiq.me.conf.snippet /etc/nginx/sites-available/api.shopiq.me
+#   sudo ln -sf /etc/nginx/sites-available/api.shopiq.me /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+#
+# Verify:
+#   curl -i https://api.shopiq.me/api/health
+#   curl -i -X OPTIONS https://api.shopiq.me/api/health \
+#     -H "Origin: https://shopiq.me" \
+#     -H "Access-Control-Request-Method: GET"
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name api.shopiq.me;
+
+    # Match your existing cert (often same cert as shopiq.me):
+    # ssl_certificate     /etc/letsencrypt/live/shopiq.me/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/shopiq.me/privkey.pem;
+
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Meta Instagram webhooks — HMAC must match raw body + this header
+        proxy_set_header X-Hub-Signature-256 $http_x_hub_signature_256;
+
+        # Do not block browser preflight (CORS OPTIONS)
+        proxy_pass_request_headers on;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name api.shopiq.me;
+    return 301 https://$host$request_uri;
+}
