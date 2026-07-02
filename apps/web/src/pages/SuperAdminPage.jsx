@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { adminFetch, clearAdminApiKey } from "../lib/adminApi";
+import { throwIfNotOk, userErrorMessage, withNetworkError } from "../lib/apiErrors";
 import { buildPublicStorefrontUrl } from "../lib/storefrontUrl";
 import "./SuperAdminPage.css";
 
@@ -35,12 +36,12 @@ export function SuperAdminPage({ onExit }) {
       const res = await adminFetch("/api/admin/stores?limit=100");
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || "تعذر تحميل المتاجر.");
+        throwIfNotOk(res, body, { fallback: "تعذر تحميل المتاجر." });
       }
       setStores(body.data?.stores ?? []);
       setTotal(Number(body.data?.total) || 0);
     } catch (e) {
-      setError(e.message || "خطأ غير متوقع.");
+      setError(userErrorMessage(e, { fallback: "تعذّر تحميل قائمة المتاجر." }));
       setStores([]);
     } finally {
       setLoading(false);
@@ -62,12 +63,12 @@ export function SuperAdminPage({ onExit }) {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || "فشل التحديث.");
+        throwIfNotOk(res, body, { fallback: "فشل تحديث المتجر." });
       }
       setRowMsg((m) => ({ ...m, [storeId]: "تم الحفظ." }));
       await load();
     } catch (e) {
-      setRowMsg((m) => ({ ...m, [storeId]: e.message || "خطأ." }));
+      setRowMsg((m) => ({ ...m, [storeId]: userErrorMessage(e, { fallback: "تعذّر حفظ التغييرات." }) }));
     } finally {
       setRowBusy((b) => ({ ...b, [storeId]: false }));
     }

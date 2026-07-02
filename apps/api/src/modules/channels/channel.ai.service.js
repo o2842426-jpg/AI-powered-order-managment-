@@ -378,7 +378,7 @@ async function processChannelAiReply({
         },
       });
       console.info(
-        `[channel-ai] sent images conversation=${conversationId} count=${imageUrls.length} mid=${imgResult.messageId}`
+        `[channel-ai] sent images conversation=${conversationId} count=${productImageUrls.length} mid=${imgResult.messageId}`
       );
     } else {
       console.warn(

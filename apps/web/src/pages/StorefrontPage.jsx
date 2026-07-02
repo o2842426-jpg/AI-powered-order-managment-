@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiUrl, mediaUrl } from "../lib/api";
+import { throwIfNotOk, userErrorMessage } from "../lib/apiErrors";
 import { formatStoreMoney, normalizeStoreCurrencyCode } from "../lib/storeCurrency";
 import { getEffectivePublicStoreSlug } from "../lib/publicStoreSlug";
 import {
@@ -153,7 +154,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(body.message || `تعذر التحميل (${res.status})`);
+          throwIfNotOk(res, body, { fallback: "تعذر التحميل." });
         }
         return body;
       })
@@ -164,7 +165,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err.message || "تعذّر تحميل المتجر.");
+          setError(userErrorMessage(err, { fallback: "تعذّر تحميل المتجر." }));
           setStore(null);
           setProducts([]);
         }
@@ -237,7 +238,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(body.message || `تعذر التحميل (${res.status})`);
+          throwIfNotOk(res, body, { fallback: "تعذر التحميل." });
         }
         return body;
       })
@@ -247,7 +248,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
       })
       .catch((err) => {
         if (!cancelled) {
-          setDetailError(err.message || "تعذر تحميل تفاصيل المنتج.");
+          setDetailError(userErrorMessage(err, { fallback: "تعذر تحميل تفاصيل المنتج." }));
           setProductDetail(null);
         }
       })
@@ -503,7 +504,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
       );
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || body.error || `فشل (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "فشل." });
       }
       setOrderMsg(`تم إنشاء الطلب رقم ${body.data?.order_id ?? ""}. شكرًا!`);
       setCart([]);
@@ -515,7 +516,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
       setCheckoutError("");
       setCreatedOrder(body.data ?? null);
     } catch (e) {
-      setOrderMsg(e.message || "تعذر إرسال الطلب.");
+      setOrderMsg(userErrorMessage(e, { fallback: "تعذر إرسال الطلب." }));
     } finally {
       setOrderSending(false);
     }
@@ -540,7 +541,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
     const body = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      throw new Error(body.message || `فشل إنشاء جلسة الشات (${res.status})`);
+      throwIfNotOk(res, body, { fallback: "فشل إنشاء جلسة الشات." });
     }
 
     const newSessionId = body.data?.id;
@@ -578,7 +579,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
       const body = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(body.message || `فشل إرسال الرسالة (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "فشل إرسال الرسالة." });
       }
 
       setChatHumanTakeover(Boolean(body.data?.owner_takeover_active));
@@ -589,7 +590,7 @@ export function StorefrontPage({ publicSlugVersion = "guest" }) {
       });
       setChatText("");
     } catch (e) {
-      setChatError(e.message || "تعذر إرسال الرسالة.");
+      setChatError(userErrorMessage(e, { fallback: "تعذر إرسال الرسالة." }));
     } finally {
       setChatLoading(false);
     }

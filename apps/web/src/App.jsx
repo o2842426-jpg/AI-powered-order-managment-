@@ -8,6 +8,7 @@ import {
   refreshStoredAuth,
   storeAuth,
 } from "./lib/auth";
+import { userErrorMessage, throwIfNotOk, withNetworkError } from "./lib/apiErrors";
 import { rememberPublicStoreSlug } from "./lib/publicStoreSlug";
 import {
   OWNER_APP_VIEWS,
@@ -129,9 +130,7 @@ function App() {
     authFetch("/api/billing/status")
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(body.message || "billing status failed");
-        }
+        throwIfNotOk(res, body, { fallback: "تعذّر تحميل حالة الفوترة." });
         return body;
       })
       .then((body) => {
@@ -251,36 +250,42 @@ function App() {
   }
 
   async function startCheckout(plan = "starter") {
-    const res = await authFetch("/api/billing/checkout-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan }),
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      window.alert(body.message || "تعذر بدء الدفع.");
-      return;
-    }
-    const url = body.data?.url;
-    if (url) {
-      window.location.href = url;
+    try {
+      await withNetworkError(async () => {
+        const res = await authFetch("/api/billing/checkout-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan }),
+        });
+        const body = await res.json().catch(() => ({}));
+        throwIfNotOk(res, body, { fallback: "تعذر بدء الدفع." });
+        const url = body.data?.url;
+        if (url) {
+          window.location.href = url;
+        }
+      });
+    } catch (err) {
+      window.alert(userErrorMessage(err, { fallback: "تعذر بدء الدفع." }));
     }
   }
 
   async function openBillingPortal() {
-    const res = await authFetch("/api/billing/portal-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      window.alert(body.message || "تعذر فتح بوابة الفوترة.");
-      return;
-    }
-    const url = body.data?.url;
-    if (url) {
-      window.location.href = url;
+    try {
+      await withNetworkError(async () => {
+        const res = await authFetch("/api/billing/portal-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+        const body = await res.json().catch(() => ({}));
+        throwIfNotOk(res, body, { fallback: "تعذر فتح بوابة الفوترة." });
+        const url = body.data?.url;
+        if (url) {
+          window.location.href = url;
+        }
+      });
+    } catch (err) {
+      window.alert(userErrorMessage(err, { fallback: "تعذر فتح بوابة الفوترة." }));
     }
   }
 

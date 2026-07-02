@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { authFetch, getOwnerStoreIdFromAuth } from "../lib/auth";
+import { messageFromApiResponse, throwIfNotOk, userErrorMessage } from "../lib/apiErrors";
 import { mediaUrl } from "../lib/api";
 import "./OwnerConversationsPage.css";
 
@@ -94,11 +95,11 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
         return;
       }
       if (!res.ok) {
-        throw new Error(body.message || `تعذّر التحميل (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذّر تحميل المحادثات." });
       }
       setSessions(Array.isArray(body.data) ? body.data : []);
     } catch (e) {
-      setError(e.message || "تعذّر تحميل المحادثات.");
+      setError(userErrorMessage(e, { fallback: "تعذّر تحميل المحادثات." }));
       setSessions([]);
     } finally {
       setLoading(false);
@@ -134,7 +135,7 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
             setSelectedId(null);
             void loadSessionsRef.current();
           } else if (!silent) {
-            setDetailError(body.message || `تعذّر التحميل (${res.status})`);
+            setDetailError(messageFromApiResponse(res, body, { fallback: "تعذّر فتح المحادثة." }));
           }
           return null;
         }
@@ -143,7 +144,7 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
         return data;
       } catch (e) {
         if (!silent) {
-          setDetailError(e.message || "تعذّر فتح المحادثة.");
+          setDetailError(userErrorMessage(e, { fallback: "تعذّر فتح المحادثة." }));
         }
         return null;
       } finally {
@@ -177,11 +178,11 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
         return;
       }
       if (!res.ok) {
-        throw new Error(body.message || `تعذّر التحميل (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذّر تحميل مقترحات المتابعة." });
       }
       setFollowupTasks(Array.isArray(body.data) ? body.data : []);
     } catch (e) {
-      setFollowupTasksError(e.message || "تعذّر تحميل مقترحات المتابعة.");
+      setFollowupTasksError(userErrorMessage(e, { fallback: "تعذّر تحميل مقترحات المتابعة." }));
       setFollowupTasks([]);
     } finally {
       setFollowupTasksLoading(false);
@@ -211,13 +212,13 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
         return;
       }
       if (!res.ok) {
-        throw new Error(body.message || `تعذّر التحديث (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذّر تحديث المهمة." });
       }
       setFollowupTasks((prev) => prev.filter((t) => t.id !== taskId));
       await loadSessions();
       await loadFollowupTasks();
     } catch (e) {
-      setFollowupTasksError(e.message || "تعذّر تحديث المهمة.");
+      setFollowupTasksError(userErrorMessage(e, { fallback: "تعذّر تحديث المهمة." }));
     } finally {
       setFollowupActionId(null);
     }
@@ -277,7 +278,7 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
         return;
       }
       if (!res.ok) {
-        throw new Error(body.message || `تعذّر التحديث (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذّر تحديث وضع التولّي." });
       }
       const nextConversation = body.data?.conversation;
       if (nextConversation) {
@@ -287,7 +288,7 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
       }
       await loadSessions();
     } catch (e) {
-      setTakeoverGateError(e.message || "تعذّر تحديث وضع التولّي.");
+      setTakeoverGateError(userErrorMessage(e, { fallback: "تعذّر تحديث وضع التولّي." }));
     } finally {
       setTakeoverSaving(false);
     }
@@ -318,17 +319,17 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
         return;
       }
       if (res.status === 502 && body.code === "INSTAGRAM_SEND_FAILED") {
-        setOwnerSendError(body.error || body.message || "تعذّر الإرسال إلى إنستغرام.");
+        setOwnerSendError(messageFromApiResponse(res, body, { fallback: "تعذّر الإرسال إلى إنستغرام." }));
         return;
       }
       if (!res.ok) {
-        throw new Error(body.message || `تعذّر الإرسال (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذّر إرسال الرسالة." });
       }
       setOwnerComposerText("");
       await fetchSessionDetail(selectedId, { silent: true });
       await loadSessions();
     } catch (e) {
-      setOwnerSendError(e.message || "تعذّر إرسال الرسالة.");
+      setOwnerSendError(userErrorMessage(e, { fallback: "تعذّر إرسال الرسالة." }));
     } finally {
       setOwnerSending(false);
     }

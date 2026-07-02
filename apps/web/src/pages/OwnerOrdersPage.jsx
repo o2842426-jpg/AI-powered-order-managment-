@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { authFetch, getOwnerStoreIdFromAuth } from '../lib/auth';
+import { throwIfNotOk, userErrorMessage, withNetworkError } from '../lib/apiErrors';
 import { formatStoreMoney, normalizeStoreCurrencyCode } from '../lib/storeCurrency';
 import './OwnerOrdersPage.css';
 
@@ -67,7 +68,7 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(body.message || `Request failed (${res.status})`);
+          throwIfNotOk(res, body, { fallback: 'تعذّر تحميل الطلب.' });
         }
         return body;
       })
@@ -78,7 +79,7 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
       })
       .catch((err) => {
         if (!cancelled) {
-          setDetailError(err.message || 'Could not load order.');
+          setDetailError(userErrorMessage(err, { fallback: 'تعذّر تحميل تفاصيل الطلب.' }));
           setOrderDetail(null);
         }
       })
@@ -112,7 +113,7 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
         const body = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          throw new Error(body.message || `Request failed (${res.status})`);
+          throwIfNotOk(res, body, { fallback: 'تعذّر تحميل الطلب.' });
         }
 
         if (!cancelled) {
@@ -120,7 +121,7 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
         }
       } catch (e) {
         if (!cancelled) {
-          setError(e.message || 'Could not load orders.');
+          setError(userErrorMessage(e, { fallback: 'تعذّر تحميل الطلبات.' }));
           setOrders([]);
         }
       } finally {
@@ -149,7 +150,7 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `Request failed (${res.status})`);
+        throwIfNotOk(res, body, { fallback: 'تعذّر تحميل الطلب.' });
       }
       const updated = body.data;
       setOrderDetail((prev) => {
@@ -174,7 +175,7 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
       );
       setStatusMessage('تم تحديث الحالة.');
     } catch (e) {
-      setStatusMessage(e.message || 'تعذر تحديث الحالة.');
+      setStatusMessage(userErrorMessage(e, { fallback: 'تعذر تحديث حالة الطلب.' }));
     } finally {
       setStatusSaving(false);
     }
@@ -192,7 +193,7 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `Request failed (${res.status})`);
+        throwIfNotOk(res, body, { fallback: 'تعذّر تحميل الطلب.' });
       }
 
       setOrders((prev) =>
@@ -212,7 +213,7 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
       });
       setStatusMessage('تم تحديث الحالة.');
     } catch (e) {
-      setStatusMessage(e.message || 'تعذر تحديث الحالة.');
+      setStatusMessage(userErrorMessage(e, { fallback: 'تعذر تحديث حالة الطلب.' }));
     } finally {
       setStatusSaving(false);
     }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { apiUrl } from "../lib/api";
 import { storeAuth } from "../lib/auth";
+import { throwIfNotOk, userErrorMessage, withNetworkError } from "../lib/apiErrors";
 import { BrandMark } from "../components/BrandMark";
 import "./OwnerLoginPage.css";
 
@@ -47,24 +48,24 @@ export function OwnerLoginPage({ onAuthenticated, onGoCreateStore }) {
           };
 
     try {
-      const res = await fetch(apiUrl(endpoint), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      await withNetworkError(async () => {
+        const res = await fetch(apiUrl(endpoint), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const body = await res.json().catch(() => ({}));
+        throwIfNotOk(res, body, { fallback: "تعذر تسجيل الدخول." });
+
+        if (!body?.data?.token || !body?.data?.user?.id) {
+          throw new Error("استجابة السيرفر ناقصة — لم يصل التوكن أو بيانات المستخدم.");
+        }
+
+        storeAuth(body.data);
+        onAuthenticated(body.data);
       });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(body.message || `تعذر تسجيل الدخول (${res.status})`);
-      }
-
-      if (!body?.data?.token || !body?.data?.user?.id) {
-        throw new Error("استجابة السيرفر ناقصة — لم يصل التوكن أو بيانات المستخدم.");
-      }
-
-      storeAuth(body.data);
-      onAuthenticated(body.data);
     } catch (err) {
-      setError(err.message || "تعذر تسجيل الدخول.");
+      setError(userErrorMessage(err, { fallback: "تعذر تسجيل الدخول." }));
     } finally {
       setLoading(false);
     }

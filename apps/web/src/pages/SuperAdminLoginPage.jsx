@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { adminFetch, setAdminApiKey, clearAdminApiKey } from "../lib/adminApi";
+import { messageFromApiResponse, throwIfNotOk, userErrorMessage, withNetworkError } from "../lib/apiErrors";
 import "./SuperAdminLoginPage.css";
 
 export function SuperAdminLoginPage({ onSuccess, onBack }) {
@@ -19,17 +20,19 @@ export function SuperAdminLoginPage({ onSuccess, onBack }) {
     clearAdminApiKey();
     setAdminApiKey(trimmed);
     try {
-      const res = await adminFetch("/api/admin/stores?limit=1");
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        clearAdminApiKey();
-        setError(body.message || "مفتاح غير صالح أو الخادم غير مهيأ.");
-        return;
-      }
-      onSuccess?.();
-    } catch {
+      await withNetworkError(async () => {
+        const res = await adminFetch("/api/admin/stores?limit=1");
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          clearAdminApiKey();
+          setError(messageFromApiResponse(res, body, { fallback: "مفتاح غير صالح أو الخادم غير مهيأ." }));
+          return;
+        }
+        onSuccess?.();
+      });
+    } catch (err) {
       clearAdminApiKey();
-      setError("تعذر الاتصال بالخادم.");
+      setError(userErrorMessage(err, { fallback: "تعذر الاتصال بالخادم." }));
     } finally {
       setLoading(false);
     }

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { apiUrl } from "../lib/api";
 import { rememberPublicStoreSlug } from "../lib/publicStoreSlug";
 import { storeAuth } from "../lib/auth";
+import { throwIfNotOk, userErrorMessage, withNetworkError } from "../lib/apiErrors";
 import { BrandMark } from "../components/BrandMark";
 import "./CreateStorePage.css";
 
@@ -41,37 +42,37 @@ export function CreateStorePage({ onDone, onBackToLogin }) {
 
     setLoading(true);
     try {
-      const res = await fetch(apiUrl("/api/auth/create-store"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          store_name: storeName.trim(),
-          slug: slug.trim() || undefined,
-          phone: phone.trim() || undefined,
-          delivery_info: deliveryInfo.trim() || undefined,
-          owner_name: ownerName.trim(),
-          email: email.trim(),
-          password,
-        }),
+      await withNetworkError(async () => {
+        const res = await fetch(apiUrl("/api/auth/create-store"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            store_name: storeName.trim(),
+            slug: slug.trim() || undefined,
+            phone: phone.trim() || undefined,
+            delivery_info: deliveryInfo.trim() || undefined,
+            owner_name: ownerName.trim(),
+            email: email.trim(),
+            password,
+          }),
+        });
+        const body = await res.json().catch(() => ({}));
+        throwIfNotOk(res, body, { fallback: "تعذر إنشاء المتجر." });
+
+        const createdSlug = body.data?.store?.slug;
+        if (createdSlug) {
+          rememberPublicStoreSlug(createdSlug);
+        }
+
+        if (!body?.data?.token || !body?.data?.user?.id) {
+          throw new Error("استجابة السيرفر ناقصة — لم يصل التوكن أو بيانات المستخدم.");
+        }
+
+        storeAuth(body.data);
+        onDone?.(body.data);
       });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(body.message || `تعذر الإنشاء (${res.status})`);
-      }
-
-      const createdSlug = body.data?.store?.slug;
-      if (createdSlug) {
-        rememberPublicStoreSlug(createdSlug);
-      }
-
-      if (!body?.data?.token || !body?.data?.user?.id) {
-        throw new Error("استجابة السيرفر ناقصة — لم يصل التوكن أو بيانات المستخدم.");
-      }
-
-      storeAuth(body.data);
-      onDone?.(body.data);
     } catch (err) {
-      setError(err.message || "تعذر إنشاء المتجر.");
+      setError(userErrorMessage(err, { fallback: "تعذر إنشاء المتجر." }));
     } finally {
       setLoading(false);
     }

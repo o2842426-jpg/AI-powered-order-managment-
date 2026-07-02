@@ -6,6 +6,7 @@ import {
   storeCurrencyOptionLabel,
 } from "../lib/storeCurrency";
 import { authFetch, getOwnerStoreIdFromAuth } from "../lib/auth";
+import { throwIfNotOk, userErrorMessage } from "../lib/apiErrors";
 import { buildPublicStorefrontUrl } from "../lib/storefrontUrl";
 import { formatProductOptionSummary } from "../lib/productOptions";
 import { OwnerMetricCard } from "../components/OwnerMetricCard";
@@ -372,12 +373,12 @@ export function OwnerDashboardPage({
           return;
         }
         if (!res.ok) {
-          throw new Error(body.message || `تعذّر التحميل (${res.status})`);
+          throwIfNotOk(res, body, { fallback: "تعذّر التحميل." });
         }
         setMemoryFacts(Array.isArray(body.data) ? body.data : []);
       } catch (e) {
         if (!cancelled) {
-          setMemoryFactsError(e.message || "تعذّر تحميل الذاكرة التشغيلية.");
+          setMemoryFactsError(userErrorMessage(e, { fallback: "تعذّر تحميل الذاكرة التشغيلية." }));
         }
       } finally {
         if (!cancelled) setMemoryFactsLoading(false);
@@ -409,12 +410,12 @@ export function OwnerDashboardPage({
           return;
         }
         if (!res.ok) {
-          throw new Error(body.message || `تعذّر التحميل (${res.status})`);
+          throwIfNotOk(res, body, { fallback: "تعذّر التحميل." });
         }
         setAiFollowups(Array.isArray(body.data) ? body.data : []);
       } catch (e) {
         if (!cancelled) {
-          setAiFollowupsError(e.message || "تعذّر تحميل عبارات المتابعة.");
+          setAiFollowupsError(userErrorMessage(e, { fallback: "تعذّر تحميل عبارات المتابعة." }));
         }
       } finally {
         if (!cancelled) setAiFollowupsLoading(false);
@@ -452,11 +453,11 @@ export function OwnerDashboardPage({
       const res = await authFetch(`/api/stores/${storeId}/settings`);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذر تحميل الإعدادات (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذر تحميل الإعدادات." });
       }
       setSettings(body.data ?? null);
     } catch (error) {
-      setSettingsError(error.message || "تعذر تحميل إعدادات المتجر.");
+      setSettingsError(userErrorMessage(error, { fallback: "تعذر تحميل إعدادات المتجر." }));
       setSettings(null);
     }
   }
@@ -475,11 +476,11 @@ export function OwnerDashboardPage({
         return;
       }
       if (!res.ok) {
-        throw new Error(body.message || `تعذّر تحميل الربط (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذّر تحميل الربط." });
       }
       setIgConnection(body.data ?? null);
     } catch (error) {
-      setIgConnectError(error.message || "تعذّر تحميل حالة ربط إنستغرام.");
+      setIgConnectError(userErrorMessage(error, { fallback: "تعذّر تحميل حالة ربط إنستغرام." }));
       setIgConnection(null);
     } finally {
       setIgConnectionLoading(false);
@@ -493,7 +494,7 @@ export function OwnerDashboardPage({
       const res = await authFetch("/api/auth/facebook/init", { method: "POST" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذّر بدء الربط (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذّر بدء الربط." });
       }
       const url = body.data?.authorize_url;
       if (!url) {
@@ -504,7 +505,7 @@ export function OwnerDashboardPage({
       }
       window.location.href = url;
     } catch (error) {
-      setIgConnectError(error.message || "تعذّر بدء ربط إنستغرام.");
+      setIgConnectError(userErrorMessage(error, { fallback: "تعذّر بدء ربط إنستغرام." }));
       setIgConnectStarting(false);
     }
   }
@@ -516,11 +517,11 @@ export function OwnerDashboardPage({
       const res = await authFetch(`/api/stores/${storeId}/summary`);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذر تحميل الملخص (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذر تحميل الملخص." });
       }
       setSummary(body.data ?? null);
     } catch (error) {
-      setSummaryError(error.message || "تعذر تحميل ملخص المتجر.");
+      setSummaryError(userErrorMessage(error, { fallback: "تعذر تحميل ملخص المتجر." }));
       setSummary(null);
     }
   }
@@ -533,11 +534,11 @@ export function OwnerDashboardPage({
       const res = await authFetch(`/api/stores/${storeId}/low-stock`);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذر تحميل المخزون المنخفض (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذر تحميل المخزون المنخفض." });
       }
       setLowStockItems(Array.isArray(body.data) ? body.data : []);
     } catch (error) {
-      setLowStockError(error.message || "تعذر تحميل قائمة المخزون المنخفض.");
+      setLowStockError(userErrorMessage(error, { fallback: "تعذر تحميل قائمة المخزون المنخفض." }));
       setLowStockItems([]);
     } finally {
       setLowStockLoading(false);
@@ -559,12 +560,12 @@ export function OwnerDashboardPage({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذر حفظ الإعدادات (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذر حفظ الإعدادات." });
       }
       setSettings(body.data ?? null);
       setSettingsMsg("تم حفظ إعدادات المتجر.");
     } catch (error) {
-      setSettingsError(error.message || "تعذر حفظ إعدادات المتجر.");
+      setSettingsError(userErrorMessage(error, { fallback: "تعذر حفظ إعدادات المتجر." }));
     } finally {
       setSettingsSaving(false);
     }
@@ -582,14 +583,14 @@ export function OwnerDashboardPage({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذّر الإضافة (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذّر الإضافة." });
       }
       if (body.data) {
         setMemoryFacts((prev) => [...prev, body.data]);
       }
       setMemoryNewText("");
     } catch (e) {
-      setMemoryFactsError(e.message || "تعذّر إضافة الحقيقة.");
+      setMemoryFactsError(userErrorMessage(e, { fallback: "تعذّر إضافة الحقيقة." }));
     } finally {
       setMemorySaving(false);
     }
@@ -606,11 +607,11 @@ export function OwnerDashboardPage({
       );
       if (!res.ok && res.status !== 204) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || `تعذّر الحذف (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذّر الحذف." });
       }
       setMemoryFacts((prev) => prev.filter((f) => f.id !== id));
     } catch (e) {
-      setMemoryFactsError(e.message || "تعذّر حذف الحقيقة.");
+      setMemoryFactsError(userErrorMessage(e, { fallback: "تعذّر حذف الحقيقة." }));
     } finally {
       setMemorySaving(false);
     }
@@ -628,14 +629,14 @@ export function OwnerDashboardPage({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذّر الإضافة (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذّر الإضافة." });
       }
       if (body.data) {
         setAiFollowups((prev) => [...prev, body.data]);
       }
       setAiFollowupNewText("");
     } catch (e) {
-      setAiFollowupsError(e.message || "تعذّر إضافة العبارة.");
+      setAiFollowupsError(userErrorMessage(e, { fallback: "تعذّر إضافة العبارة." }));
     } finally {
       setAiFollowupSaving(false);
     }
@@ -652,11 +653,11 @@ export function OwnerDashboardPage({
       );
       if (!res.ok && res.status !== 204) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || `تعذّر الحذف (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذّر الحذف." });
       }
       setAiFollowups((prev) => prev.filter((f) => f.id !== id));
     } catch (e) {
-      setAiFollowupsError(e.message || "تعذّر حذف العبارة.");
+      setAiFollowupsError(userErrorMessage(e, { fallback: "تعذّر حذف العبارة." }));
     } finally {
       setAiFollowupSaving(false);
     }
@@ -670,7 +671,7 @@ export function OwnerDashboardPage({
       const res = await authFetch("/api/products");
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذر تحميل المنتجات (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذر تحميل المنتجات." });
       }
       const storeProducts = (body.data || []).filter(
         (product) => String(product.store_id) === String(storeId)
@@ -680,7 +681,7 @@ export function OwnerDashboardPage({
         setSelectedProductId(storeProducts[0].id);
       }
     } catch (error) {
-      setProductsError(error.message || "تعذر تحميل المنتجات.");
+      setProductsError(userErrorMessage(error, { fallback: "تعذر تحميل المنتجات." }));
       setProducts([]);
     } finally {
       setProductsLoading(false);
@@ -709,7 +710,7 @@ export function OwnerDashboardPage({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذر إنشاء المنتج (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذر إنشاء المنتج." });
       }
       setProductDraft(EMPTY_PRODUCT);
       setSelectedProductId(body.data?.id ?? null);
@@ -718,7 +719,7 @@ export function OwnerDashboardPage({
       await loadLowStock();
       await loadProducts();
     } catch (error) {
-      setDashboardMsg(error.message || "تعذر إنشاء المنتج.");
+      setDashboardMsg(userErrorMessage(error, { fallback: "تعذر إنشاء المنتج." }));
     } finally {
       setProductSaving(false);
     }
@@ -741,14 +742,14 @@ export function OwnerDashboardPage({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذر تعديل المنتج (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذر تعديل المنتج." });
       }
       setDashboardMsg("تم تعديل المنتج.");
       await loadSummary();
       await loadLowStock();
       await loadProducts();
     } catch (error) {
-      setDashboardMsg(error.message || "تعذر تعديل المنتج.");
+      setDashboardMsg(userErrorMessage(error, { fallback: "تعذر تعديل المنتج." }));
     } finally {
       setProductSaving(false);
     }
@@ -772,7 +773,7 @@ export function OwnerDashboardPage({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذر تحديث المنتج (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذر تحديث المنتج." });
       }
 
       setDashboardMsg(isActive ? "تم إظهار المنتج في المتجر." : "تم إخفاء المنتج من المتجر.");
@@ -780,7 +781,7 @@ export function OwnerDashboardPage({
       await loadLowStock();
       await loadProducts();
     } catch (error) {
-      setDashboardMsg(error.message || "تعذر تحديث المنتج.");
+      setDashboardMsg(userErrorMessage(error, { fallback: "تعذر تحديث المنتج." }));
     } finally {
       setProductSaving(false);
     }
@@ -811,7 +812,7 @@ export function OwnerDashboardPage({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذر رفع الصورة (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذر رفع الصورة." });
       }
 
       const imageUrl = body.data?.image_url || "";
@@ -822,7 +823,7 @@ export function OwnerDashboardPage({
       }
       setDashboardMsg("تم رفع الصورة. احفظ المنتج لتثبيت الرابط.");
     } catch (error) {
-      setDashboardMsg(error.message || "تعذر رفع الصورة.");
+      setDashboardMsg(userErrorMessage(error, { fallback: "تعذر رفع الصورة." }));
     } finally {
       setImageUploading(false);
     }
@@ -854,7 +855,7 @@ export function OwnerDashboardPage({
       });
       const uploadBody = await uploadRes.json().catch(() => ({}));
       if (!uploadRes.ok) {
-        throw new Error(uploadBody.message || `تعذر رفع الصورة (${uploadRes.status})`);
+        throwIfNotOk(uploadRes, uploadBody, { fallback: "تعذر رفع الصورة." });
       }
 
       const imageUrl = uploadBody.data?.image_url || "";
@@ -869,14 +870,14 @@ export function OwnerDashboardPage({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذر إضافة الصورة (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذر إضافة الصورة." });
       }
 
       setProductExtraImages((prev) => [...prev, body.data]);
       setDashboardMsg("تمت إضافة صورة إضافية للمنتج.");
       await loadProducts();
     } catch (error) {
-      setDashboardMsg(error.message || "تعذر إضافة الصورة الإضافية.");
+      setDashboardMsg(userErrorMessage(error, { fallback: "تعذر إضافة الصورة الإضافية." }));
     } finally {
       setImageUploading(false);
     }
@@ -895,14 +896,14 @@ export function OwnerDashboardPage({
       );
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذر حذف الصورة (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذر حذف الصورة." });
       }
 
       setProductExtraImages((prev) => prev.filter((img) => img.id !== imageId));
       setDashboardMsg("تم حذف الصورة الإضافية.");
       await loadProducts();
     } catch (error) {
-      setDashboardMsg(error.message || "تعذر حذف الصورة.");
+      setDashboardMsg(userErrorMessage(error, { fallback: "تعذر حذف الصورة." }));
     } finally {
       setImageUploading(false);
     }
@@ -925,7 +926,7 @@ export function OwnerDashboardPage({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذر رفع اللوجو (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذر رفع اللوجو." });
       }
 
       setSettings((prev) => ({
@@ -934,7 +935,7 @@ export function OwnerDashboardPage({
       }));
       setSettingsMsg("تم رفع اللوجو. احفظ الإعدادات لتثبيته.");
     } catch (error) {
-      setSettingsError(error.message || "تعذر رفع اللوجو.");
+      setSettingsError(userErrorMessage(error, { fallback: "تعذر رفع اللوجو." }));
     } finally {
       setImageUploading(false);
     }
@@ -947,11 +948,11 @@ export function OwnerDashboardPage({
       const res = await authFetch(`/api/products/${productId}/variants`);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذر تحميل الخيارات (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذر تحميل الخيارات." });
       }
       setVariants(body.data || []);
     } catch (error) {
-      setDashboardMsg(error.message || "تعذر تحميل خيارات المنتج.");
+      setDashboardMsg(userErrorMessage(error, { fallback: "تعذر تحميل خيارات المنتج." }));
       setVariants([]);
     } finally {
       setVariantsLoading(false);
@@ -998,7 +999,7 @@ export function OwnerDashboardPage({
       );
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذر إنشاء الخيار (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذر إنشاء الخيار." });
       }
       setVariantDraft(EMPTY_VARIANT);
       setDashboardMsg("تم إنشاء خيار المنتج.");
@@ -1006,7 +1007,7 @@ export function OwnerDashboardPage({
       await loadLowStock();
       await loadVariants(selectedProductId);
     } catch (error) {
-      setDashboardMsg(error.message || "تعذر إنشاء خيار المنتج.");
+      setDashboardMsg(userErrorMessage(error, { fallback: "تعذر إنشاء خيار المنتج." }));
     } finally {
       setVariantSaving(false);
     }
@@ -1032,14 +1033,14 @@ export function OwnerDashboardPage({
       );
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.message || `تعذر تعديل الخيار (${res.status})`);
+        throwIfNotOk(res, body, { fallback: "تعذر تعديل الخيار." });
       }
       setDashboardMsg("تم تعديل خيار المنتج.");
       await loadSummary();
       await loadLowStock();
       await loadVariants(selectedProductId);
     } catch (error) {
-      setDashboardMsg(error.message || "تعذر تعديل خيار المنتج.");
+      setDashboardMsg(userErrorMessage(error, { fallback: "تعذر تعديل خيار المنتج." }));
     } finally {
       setVariantSaving(false);
     }
