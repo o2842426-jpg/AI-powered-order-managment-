@@ -133,7 +133,9 @@ function upsertConversationForInbound({
  *   storeId: number,
  *   mid: string,
  *   text: string,
- *   messageAt?: string | null
+ *   messageAt?: string | null,
+ *   messageType?: string,
+ *   payload?: object | null
  * }} input
  */
 function insertInboundChannelMessage({
@@ -142,7 +144,14 @@ function insertInboundChannelMessage({
   mid,
   text,
   messageAt,
+  messageType = "text",
+  payload = null,
 }) {
+  const normalizedType = String(messageType || "text").trim() || "text";
+  const bodyText =
+    String(text || "").trim() ||
+    (normalizedType === "image" ? "[صورة من العميل]" : "");
+
   db.prepare(
     `
       INSERT INTO channel_messages (
@@ -154,12 +163,22 @@ function insertInboundChannelMessage({
         external_message_id,
         message_type,
         body_text,
+        payload,
         delivery_status,
         sent_at
       )
-      VALUES (?, ?, ?, 'inbound', 'customer', ?, 'text', ?, 'received', ?)
+      VALUES (?, ?, ?, 'inbound', 'customer', ?, ?, ?, ?, 'received', ?)
     `
-  ).run(conversationId, storeId, PLATFORM, mid, text, messageAt);
+  ).run(
+    conversationId,
+    storeId,
+    PLATFORM,
+    mid,
+    normalizedType,
+    bodyText,
+    payload ? JSON.stringify(payload) : null,
+    messageAt
+  );
 }
 
 /**
@@ -170,6 +189,7 @@ function insertInboundChannelMessage({
  *   senderIgsid: string,
  *   recipientIgId: string,
  *   text: string,
+ *   imageUrls?: string[],
  *   timestamp?: number | null,
  *   entryId?: string | null
  * }} event
@@ -192,6 +212,12 @@ function persistInboundDmEvent(event) {
   }
 
   const messageAt = metaTimestampToIso(event.timestamp);
+  const imageUrls = Array.isArray(event.imageUrls)
+    ? event.imageUrls.filter((u) => typeof u === "string" && u.trim())
+    : [];
+  const hasImages = imageUrls.length > 0;
+  const messageType = hasImages ? "image" : "text";
+  const payload = hasImages ? { customer_image_urls: imageUrls } : null;
 
   const run = db.transaction(() => {
     const conversation = upsertConversationForInbound({
@@ -207,6 +233,8 @@ function persistInboundDmEvent(event) {
       mid: event.mid,
       text: event.text,
       messageAt,
+      messageType,
+      payload,
     });
 
     return {

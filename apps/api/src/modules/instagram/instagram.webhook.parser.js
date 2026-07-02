@@ -1,8 +1,8 @@
 const ACCEPTED_WEBHOOK_OBJECTS = new Set(["instagram", "page"]);
 
 /**
- * Extract inbound text DM events from a Meta webhook payload (Instagram v1).
- * Skips: echoes, non-text messages, events without mid.
+ * Extract inbound text + image DM events from a Meta webhook payload (Instagram v1).
+ * Skips: echoes, events without mid, messages with neither text nor image.
  *
  * @param {unknown} payload
  * @returns {Array<{
@@ -10,11 +10,36 @@ const ACCEPTED_WEBHOOK_OBJECTS = new Set(["instagram", "page"]);
  *   senderIgsid: string,
  *   recipientIgId: string,
  *   text: string,
+ *   imageUrls: string[],
  *   timestamp: number | null,
  *   entryId: string | null,
  *   raw: object
  * }>}
  */
+function extractInboundImageUrls(message) {
+  const attachments = Array.isArray(message?.attachments) ? message.attachments : [];
+  const urls = [];
+  const seen = new Set();
+
+  for (const att of attachments) {
+    if (!att || typeof att !== "object") continue;
+    const type = String(att.type || "").toLowerCase();
+    if (type !== "image") continue;
+
+    const url =
+      att.payload?.url != null
+        ? String(att.payload.url).trim()
+        : att.payload?.story_media_url != null
+          ? String(att.payload.story_media_url).trim()
+          : "";
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    urls.push(url);
+  }
+
+  return urls;
+}
+
 function parseInstagramMessagingEvents(payload) {
   const events = [];
   if (!payload || typeof payload !== "object") {
@@ -49,7 +74,8 @@ function parseInstagramMessagingEvents(payload) {
 
       const text =
         item.message?.text != null ? String(item.message.text).trim() : "";
-      if (!text) {
+      const imageUrls = extractInboundImageUrls(item.message);
+      if (!text && !imageUrls.length) {
         continue;
       }
 
@@ -66,6 +92,7 @@ function parseInstagramMessagingEvents(payload) {
         senderIgsid,
         recipientIgId,
         text,
+        imageUrls,
         timestamp: item.timestamp != null ? Number(item.timestamp) : null,
         entryId,
         raw: item,
@@ -76,4 +103,4 @@ function parseInstagramMessagingEvents(payload) {
   return events;
 }
 
-module.exports = { parseInstagramMessagingEvents };
+module.exports = { parseInstagramMessagingEvents, extractInboundImageUrls };

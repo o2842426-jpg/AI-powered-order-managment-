@@ -90,7 +90,8 @@ function collectDmProductImageUrls(products, recommendedIds) {
  *   conversationId: number,
  *   connectionId: number,
  *   customerIgsid: string,
- *   inboundText: string
+ *   inboundText: string,
+ *   inboundImageUrls?: string[]
  * }} input
  */
 async function processChannelAiReply({
@@ -99,6 +100,7 @@ async function processChannelAiReply({
   connectionId,
   customerIgsid,
   inboundText,
+  inboundImageUrls = [],
 }) {
   const store = db
     .prepare(
@@ -171,6 +173,20 @@ async function processChannelAiReply({
   const products = loadActiveProductCatalog(store.id);
   const history = listChannelMessagesForAi(conversationId, 8);
 
+  let priorHistory = history;
+  let currentText = inboundText;
+  const imageUrls = Array.isArray(inboundImageUrls)
+    ? inboundImageUrls.filter((u) => typeof u === "string" && u.trim())
+    : [];
+
+  if (history.length > 0) {
+    const last = history[history.length - 1];
+    if (last.sender_type === "customer") {
+      priorHistory = history.slice(0, -1);
+      currentText = last.message_text || inboundText;
+    }
+  }
+
   let memoryFacts = [];
   if (allowMemory) {
     memoryFacts = db
@@ -204,11 +220,12 @@ async function processChannelAiReply({
   const aiResult = await generateStoreChatReply({
     store,
     products,
-    messageText: inboundText,
-    conversationMessages: history,
+    messageText: currentText,
+    conversationMessages: priorHistory,
     memoryFacts,
     followups,
     channelContext: "instagram_dm",
+    customerImageUrls: imageUrls,
   });
 
   const recommendedIds = Array.isArray(aiResult.recommended_product_ids)

@@ -70,24 +70,47 @@ ${variantsText}`;
     .join("\n\n---\n\n");
 }
 
-function buildConversationMessages(conversationMessages, messageText) {
+function buildUserMessageContent(messageText, customerImageUrls) {
+  const urls = (customerImageUrls || [])
+    .map((u) => String(u || "").trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  const text =
+    String(messageText || "").trim() ||
+    (urls.length
+      ? "الزبون أرسل صورة منتج ويسأل إذا عندنا نفس الموديل أو شي شبيه من المخزون."
+      : "");
+
+  if (!urls.length) {
+    return text;
+  }
+
+  const parts = [{ type: "text", text }];
+  for (const url of urls) {
+    parts.push({
+      type: "image_url",
+      image_url: { url, detail: "low" },
+    });
+  }
+  return parts;
+}
+
+function buildConversationMessages(conversationMessages, messageText, customerImageUrls) {
   const safeHistory = Array.isArray(conversationMessages)
     ? conversationMessages.slice(-MAX_HISTORY_MESSAGES)
     : [];
 
-  if (!safeHistory.length) {
-    return [
-      {
-        role: "user",
-        content: messageText,
-      },
-    ];
+  const mapped = safeHistory.map((message) => ({
+    role: message.sender_type === "ai" ? "assistant" : "user",
+    content: message.message_text || "—",
+  }));
+
+  const userContent = buildUserMessageContent(messageText, customerImageUrls);
+  if (userContent) {
+    mapped.push({ role: "user", content: userContent });
   }
 
-  return safeHistory.map((message) => ({
-    role: message.sender_type === "ai" ? "assistant" : "user",
-    content: message.message_text,
-  }));
+  return mapped;
 }
 
 function buildChannelContextBlock(channelContext, salesMode) {
@@ -233,9 +256,10 @@ function buildFollowupsBlock(rows) {
 /**
  * @param {string} raw
  * @param {Set<number>} allowedProductIds
- * @returns {{ reply: string, recommended_product_ids: number[] }}
+ * @returns {{ reply: string, recommended_product_ids: number[], image_match_confidence?: string, needs_human_handoff?: boolean }}
  */
-function parseAiChatEnvelope(raw, allowedProductIds) {
+function parseAiChatEnvelope(raw, allowedProductIds, options = {}) {
+  const { visionMode = false } = options;
   const text = String(raw || "").trim();
   if (!text) {
     return { reply: FALLBACK_REPLY, recommended_product_ids: [] };
@@ -261,8 +285,11 @@ function parseAiChatEnvelope(raw, allowedProductIds) {
     return { reply: text, recommended_product_ids: [] };
   }
 
-  const reply =
+  let reply =
     typeof obj.reply === "string" && obj.reply.trim() ? obj.reply.trim() : text;
+
+  const confidence = String(obj.image_match_confidence || "").trim().toLowerCase();
+  const needsHandoff = obj.needs_human_handoff === true;
 
   const rawIds = Array.isArray(obj.recommended_product_ids)
     ? obj.recommended_product_ids
@@ -278,7 +305,18 @@ function parseAiChatEnvelope(raw, allowedProductIds) {
     if (sanitized.length >= MAX_RECOMMENDED_IDS) break;
   }
 
-  return { reply, recommended_product_ids: sanitized };
+  if (visionMode) {
+    if (needsHandoff || confidence === "none" || (confidence === "low" && !sanitized.length)) {
+      reply = EMERGENCY_HANDOFF_REPLY;
+    }
+  }
+
+  return {
+    reply,
+    recommended_product_ids: sanitized,
+    image_match_confidence: confidence || undefined,
+    needs_human_handoff: needsHandoff || undefined,
+  };
 }
 
 /**
@@ -296,6 +334,17 @@ function resolveChatModel(store) {
   return economyModel;
 }
 
+function resolveVisionModel(store) {
+  const configured = String(
+    process.env.OPENAI_VISION_MODEL ||
+      process.env.OPENAI_MODEL_PAID ||
+      process.env.OPENAI_MODEL ||
+      "gpt-4o-mini"
+  ).trim();
+  if (configured) return configured;
+  return resolveChatModel(store);
+}
+
 /**
  * @returns {Promise<{ reply: string, recommended_product_ids: number[] }>}
  */
@@ -307,6 +356,7 @@ async function generateStoreChatReply({
   memoryFacts,
   followups = [],
   channelContext = null,
+  customerImageUrls = [],
 }) {
   const allowedProductIds = new Set(
     (products || []).map((p) => Number(p.id)).filter((n) => Number.isInteger(n) && n > 0)
@@ -325,13 +375,26 @@ async function generateStoreChatReply({
   const memoryBlock = buildMemoryFactsBlock(memoryFacts);
   const followupsBlock = buildFollowupsBlock(followups);
   const channelBlock = buildChannelContextBlock(channelContext, salesMode);
+  const visionMode = Array.isArray(customerImageUrls) && customerImageUrls.length > 0;
   const historyMessages = buildConversationMessages(
     conversationMessages,
-    messageText
+    messageText,
+    customerImageUrls
   );
 
-  const model = resolveChatModel(store);
+  const model = visionMode ? resolveVisionModel(store) : resolveChatModel(store);
   const temperature = resolveSalesTemperature(salesMode);
+
+  const visionJsonRules = visionMode
+    ? `
+- الزبون أرسل صورة مرفقة: حلّلها بصرياً وطابقها مع الكتالوج (اسم، لون، شكل، نوع).
+- أضف الحقول:
+  "image_match_confidence": "high" | "medium" | "low" | "none"
+  "needs_human_handoff": true | false
+- إذا التطابق قوي (80%+): ضع product_id في recommended_product_ids + رد بيعي بسعر من الكتالوج.
+- إذا الصورة شخص/طبيعة/منتج غير موجود/غير واضح: needs_human_handoff=true و image_match_confidence="none" و recommended_product_ids=[] و reply يكون نص الطوارئ من التعليمات.
+`
+    : "";
 
   const recommendAggressive =
     salesMode === "aggressive"
@@ -344,8 +407,9 @@ async function generateStoreChatReply({
 أجب دائمًا بجسم JSON صالح فقط (بدون نص خارج JSON)، بالشكل التالي بالضبط:
 {
   "reply": "نص عربي طبيعي للعميل — لهجة عراقية، وكل رد ينتهي بسؤال CTA",
-  "recommended_product_ids": []
+  "recommended_product_ids": []${visionMode ? ',\n  "image_match_confidence": "high",\n  "needs_human_handoff": false' : ""}
 }
+${visionJsonRules}
 
 قواعد recommended_product_ids (مهم جدًا):
 - ضع في المصفوفة فقط أرقام product_id موجودة حرفيًا في كتالوج «بيانات المتجر والمنتجات» أدناه. لا تخترع رقمًا.
@@ -390,7 +454,7 @@ ${catalogText}`,
     });
 
     const raw = response.choices[0]?.message?.content?.trim() || "";
-    return parseAiChatEnvelope(raw, allowedProductIds);
+    return parseAiChatEnvelope(raw, allowedProductIds, { visionMode });
   } catch (err) {
     console.error("[ai] OpenAI chat.completions failed:", err?.message || err);
     return { reply: FALLBACK_REPLY, recommended_product_ids: [] };
@@ -400,8 +464,10 @@ ${catalogText}`,
 module.exports = {
   generateStoreChatReply,
   resolveChatModel,
+  resolveVisionModel,
   resolveSalesMode,
   parseAiChatEnvelope,
   buildCatalogText,
+  buildUserMessageContent,
   EMERGENCY_HANDOFF_REPLY,
 };

@@ -20,7 +20,7 @@ const { processChannelAiReply } = require("../channels/channel.ai.service");
  *   channel_recorded: number,
  *   ai_triggered: number,
  *   skipped_duplicate: number,
- *   skipped_no_text: number,
+ *   skipped_no_content: number,
  *   skipped_no_connection: number
  * }}
  */
@@ -32,7 +32,7 @@ function processInstagramWebhookPayload(payload) {
     channel_recorded: 0,
     ai_triggered: 0,
     skipped_duplicate: 0,
-    skipped_no_text: 0,
+    skipped_no_content: 0,
     skipped_no_connection: 0,
   };
 
@@ -50,6 +50,7 @@ function processInstagramWebhookPayload(payload) {
       senderIgsid: event.senderIgsid,
       recipientIgId: event.recipientIgId,
       text: event.text,
+      imageUrls: event.imageUrls,
       timestamp: event.timestamp,
       entryId: event.entryId,
     };
@@ -70,6 +71,7 @@ function processInstagramWebhookPayload(payload) {
             connectionId: channelResult.connectionId,
             customerIgsid: event.senderIgsid,
             inboundText: event.text,
+            inboundImageUrls: event.imageUrls,
           }).catch((err) => {
             console.error(
               `[channel-ai] unhandled conversation=${channelResult.conversationId}:`,
@@ -83,7 +85,7 @@ function processInstagramWebhookPayload(payload) {
 
       insertWebhookEvent({
         eventId: event.mid,
-        eventType: "inbound_text",
+        eventType: event.imageUrls?.length ? "inbound_image" : "inbound_text",
         storeId,
         rawPayload,
         error: channelError,
@@ -92,7 +94,7 @@ function processInstagramWebhookPayload(payload) {
 
       if (channelResult.ok) {
         console.info(
-          `[instagram-webhook] channel inbound mid=${event.mid} store=${storeId} conversation=${channelResult.conversationId} from=${event.senderIgsid}`
+          `[instagram-webhook] channel inbound mid=${event.mid} store=${storeId} conversation=${channelResult.conversationId} from=${event.senderIgsid} images=${event.imageUrls?.length || 0}`
         );
       } else {
         console.warn(
