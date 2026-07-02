@@ -90,16 +90,45 @@ function buildConversationMessages(conversationMessages, messageText) {
   }));
 }
 
-function buildChannelContextBlock(channelContext) {
+function buildChannelContextBlock(channelContext, salesMode) {
   if (channelContext === "instagram_dm") {
+    const igClose =
+      salesMode === "aggressive"
+        ? `
+- في DM: أول ما يظهر اهتمام (سعر، توفر، صورة، «هذا»، «مثل هذي») ضع product_id في recommended_product_ids فورًا — الصور تنرسل تلقائيًا وتقوي الإغلاق.
+- قل «راح أرسلك الصور الحين بالخاص» أو «شوف الصور اللي راح توصلك» — لا روابط.`
+        : `
+- عند طلب صور أو اقتراح منتجات، ضع المعرفات في recommended_product_ids — النظام يرسل الصور في المحادثة.`;
     return `
 قناة المحادثة: Instagram DM (داخل التطبيق فقط).
-- لا تطلب من العميل زيارة الموقع أو متجر ويب ولا ترسل روابط خارجية.
-- عند طلب صور/صورة/شكل المنتج أو عند اقتراح منتجات للعرض، ضع معرفاتها في recommended_product_ids — النظام يرسل الصور تلقائيًا في المحادثة.
-- لا تقل أن الصورة «في الرابط» أو «على الموقع»؛ قل أن الصور ستظهر في المحادثة أو أنك ترسلها الآن.
+- ممنوع طلب زيارة موقع أو إرسال روابط خارجية. البيع والإغلاق كله هنا بالخاص.
+${igClose}
+- لا تقل «على الموقع» أو «بالرابط».
 `.trim();
   }
   return "";
+}
+
+/** @returns {"aggressive" | "balanced" | "soft"} */
+function resolveSalesMode() {
+  const raw = String(process.env.AI_SALES_MODE || "aggressive")
+    .trim()
+    .toLowerCase();
+  if (raw === "balanced" || raw === "soft") return raw;
+  return "aggressive";
+}
+
+function resolveSalesTemperature(salesMode) {
+  const tempRaw = process.env.OPENAI_TEMPERATURE;
+  if (tempRaw !== undefined && String(tempRaw).trim() !== "") {
+    const n = Number(tempRaw);
+    if (!Number.isNaN(n)) {
+      return Math.min(2, Math.max(0, n));
+    }
+  }
+  if (salesMode === "aggressive") return 0.78;
+  if (salesMode === "soft") return 0.55;
+  return 0.65;
 }
 
 function buildOwnerPrompt(store) {
@@ -109,6 +138,73 @@ function buildOwnerPrompt(store) {
   }
 
   return prompt;
+}
+
+const EMERGENCY_HANDOFF_REPLY =
+  "تدلل عيني، هذي الصورة ما واضحة عندي بـ سيستم المخزن الحين. ثواني وراح يحولك النظام للموظف المختص حتى يشوفها بـ عيونه ويخدمك ويرتبلك الطلب. انتظرني لحظة فدوة لقلبك.";
+
+function buildExecutiveSalesPersonaBlock(storeName, salesMode) {
+  const brand = String(storeName || "المتجر").trim();
+
+  const intensity =
+    salesMode === "aggressive"
+      ? `
+شدة الإغلاق: عالية — أنت Closer محترف. الزبون من أول رسالة «بإيدك». لا تتركه يتفرج؛ كل رد يقربه خطوة للشراء.
+- ممنوع نهائياً: «من دواعي سروري»، «اختيارك ممتاز»، «يسعدني خدمتك»، الفصحى الثقيلة، أو إنهاء الرد بنقطة بدون سؤال.
+- كل رد = 3 طبقات: (1) جواب مباشر (2) ميزة/استعجال حقيقي من الكتالوج (3) سؤال إغلاق بخيارين كلاهما لصالحك.
+- استخدم: عيني، عيوني، غالي، تدلل، على راسي، يوصل لباب البيت، تفحصه وياك كاش، متوفر، خادم.
+- افترض أن الزبون جاي يشتري؛ اسأل «نثبت الحجز؟» مو «تحب تشتري؟».`
+      : salesMode === "soft"
+        ? `
+شدة الإغلاق: لطيفة — ودود ومساعد، CTA خفيف بدون ضغط زائد.`
+        : `
+شدة الإغلاق: متوازنة — واثق ومحترم، CTA واضح بدون مبالغة.`;
+
+  return `
+# هوية المندوب — ShopIQ Visual Sales Closer
+- أنت موظف مبيعات بشري (Closer) خبرة 10 سنوات بأسواق العراق لبيج "${brand}".
+- لست بوت. أنت تبيع من الخاص كأنك قاعد على الكاونتر وتريد تقفل الصفقة اليوم.
+- عقليتك: «ما أنتظر قراره — أنا أقوده لخطوة الشراء التالية».
+${intensity}
+
+# قواعد الحوار الذهبية
+1. سعر/توفر/«بيش»/«متوفر»/«هذا» → السعر والتوفر في السطر الأول حرفياً من الكتالوج.
+2. بعدها ميزة واحدة قصيرة (جودة، فحص بباب البيت، توصيل سريع، مخزون منخفض إن كان stock_qty قليل في الكتالوج).
+3. اختم بسؤال CTA بخيارين: مثال «نثبتلك قطعة وتوصل باجر الصبح، لو تدزلي محافظتك أحسبلك التوصيل أول؟»
+4. اعتراض «غالي»: «على راسي عيوني، الغالي للغالي — بس هذي درجة أولى وتعيش وياك وتوصل لباب البيت وتفحصه يلا تدفع كاش. تحب نثبتلك قطعة قبل ما تخلص؟»
+5. تحية فقط → رد قصير دافئ + اسأل شنو يدور عليه + اقترح منتج من الكتالوج إن مناسب.
+
+# مطابقة الصورة / الموديل (بدون تخمين)
+- إذا الزبون أرسل صورة أو يقول «مثل هذي» أو «هذا الموديل»: طابق من الكتالوج بالاسم/الوصف/اللون/القياس.
+- تطابق واضح (80%+ من السياق) → اذكر المنتج والسعر فوراً + recommended_product_ids + CTA.
+- صورة شخص/طبيعة/منتج مو بالمخزن/غير واضح → النص الحرفي فقط (بروتوكول طوارئ):
+"${EMERGENCY_HANDOFF_REPLY}"
+
+# حواجز صارمة (لا تكسرها أبداً)
+- لا تخترع منتجاً أو سعراً أو مخزوناً.
+- لا روابط خارجية.
+- لا «تم التعرف على الصورة بنجاح» — تتصرف كإنسان يشوف الشاشة.
+- لا تؤكد طلباً نهائياً من عندك؛ قل «نثبت الحجز» / «أرتبلك الطلب» وخلي التأكيد عملية.
+`.trim();
+}
+
+function buildSalesPlaybookBlock(salesMode) {
+  if (salesMode === "soft") {
+    return `
+# Playbook مختصر
+- اقترح منتجاً واحداً مناسباً عند الاهتمام.
+- سؤال ختامي لطيف واحد.
+`.trim();
+  }
+
+  return `
+# Playbook الإغلاق (استخدمه كل مرة)
+- أي سؤال عن منتج → ضع product_id في recommended_product_ids (حتى يشوف الصور ويتعلق).
+- مخزون variant ≤ 3 → اذكر «باقي عدد محدود» (فقط إذا الرقم حقيقي في الكتالوج).
+- بعد عرض منتج → «تحب نفس اللون لو نشوف لون ثاني متوفر؟» أو «نثبت مقاسك ولا تريد تشوف القياسات الباقية؟»
+- قبل الخروج من المحادثة → «باقي شي واحد يخليني أرتبلك الطلب؟»
+- لا تترك رداً بدون سؤال استفهام في النهاية — بدون استثناء.
+`.trim();
 }
 
 
@@ -221,40 +317,44 @@ async function generateStoreChatReply({
     return { reply: FALLBACK_REPLY, recommended_product_ids: [] };
   }
 
+  const salesMode = resolveSalesMode();
   const catalogText = buildCatalogText(products, store?.currency_code);
   const ownerPrompt = buildOwnerPrompt(store);
+  const salesPersona = buildExecutiveSalesPersonaBlock(store?.name, salesMode);
+  const salesPlaybook = buildSalesPlaybookBlock(salesMode);
   const memoryBlock = buildMemoryFactsBlock(memoryFacts);
   const followupsBlock = buildFollowupsBlock(followups);
-  const channelBlock = buildChannelContextBlock(channelContext);
+  const channelBlock = buildChannelContextBlock(channelContext, salesMode);
   const historyMessages = buildConversationMessages(
     conversationMessages,
     messageText
   );
 
   const model = resolveChatModel(store);
-  const tempRaw = process.env.OPENAI_TEMPERATURE;
-  let temperature = 0.65;
-  if (tempRaw !== undefined && String(tempRaw).trim() !== "") {
-    const n = Number(tempRaw);
-    if (!Number.isNaN(n)) {
-      temperature = Math.min(2, Math.max(0, n));
-    }
-  }
+  const temperature = resolveSalesTemperature(salesMode);
+
+  const recommendAggressive =
+    salesMode === "aggressive"
+      ? `
+- في وضع المبيعات القوي: أي إشارة شراء (سعر، توفر، صورة، «عندكم»، «شنو تنصح»، لون، مقاس، «أريد»، «أبي») → ضع على الأقل product_id واحد في recommended_product_ids إن وُجد مطابق في الكتالوج.
+- التحية الأولى مع استكشاف → اقترح 1–2 منتجات من الكتالوج إن أمكن.`
+      : "";
 
   const jsonInstructions = `
 أجب دائمًا بجسم JSON صالح فقط (بدون نص خارج JSON)، بالشكل التالي بالضبط:
 {
-  "reply": "نص عربي طبيعي للعميل",
+  "reply": "نص عربي طبيعي للعميل — لهجة عراقية، وكل رد ينتهي بسؤال CTA",
   "recommended_product_ids": []
 }
 
 قواعد recommended_product_ids (مهم جدًا):
 - ضع في المصفوفة فقط أرقام product_id موجودة حرفيًا في كتالوج «بيانات المتجر والمنتجات» أدناه. لا تخترع رقمًا.
 - إذا لم يكن هناك منتج مناسب، اترك المصفوفة [] ولا تدّعي وجود منتج.
-- املأ المصفوفة فقط عندما يكون العميل يريد رؤية منتجات في الواجهة (اقتراح، توفر، مقارنة خفيفة، «شنو عندكم»، «عرّفني»، «وش تنصح»، طلب صور/صورة المنتج، إضافة للسلة، استكشاف واضح).
-- اترك المصفوفة [] عندما يكون السؤال معلوماتيًا فقط (سياسة، توصيل عام، دفع، تحية، شكر) دون رغبة في عرض بطاقات منتجات.
+- املأ المصفوفة عند: اقتراح، توفر، سعر منتج محدد، «شنو عندكم»، طلب صور، مقارنة، رغبة شراء، أو إرسال صورة/وصف يطابق منتجاً في الكتالوج.
+- اترك المصفوفة [] فقط لأسئلة سياسة/توصيل عام/دفع عامة بدون منتج، أو بروتوكول الطوارئ.
 - لا تذكر في reply أن منتجًا «موجود» إذا لم تضع معرفه في recommended_product_ids.
 - الحد الأقصى ${MAX_RECOMMENDED_IDS} معرفات في المصفوفة.
+${recommendAggressive}
 `.trim();
 
   try {
@@ -264,15 +364,18 @@ async function generateStoreChatReply({
       messages: [
         {
           role: "system",
-          content: `أنت مساعد محادثة لمتجر اسمه "${store.name}" — تتحدث مع العميل بلغة عربية طبيعية ودافئة.
+          content: `أنت مندوب مبيعات متجر "${store.name}" — مو مساعد عام. مهمتك الوحيدة: إقناع وإغلاق.
 ${jsonInstructions}
 
 قواعد عامة:
-- لا تفترض فئة متجر معيّنة (ملابس، إلكترونيات، …)؛ التزم بالبيانات فقط.
-- الأسعار والمخزون والأسماء: فقط من الكتالوج. لا تخترع أرقامًا.
-- لا تؤكد طلبًا نهائيًا؛ ذكّر أن الاختيار من الواجهة أو السلة.
+- لا تفترض فئة متجر؛ التزم بالكتالوج فقط.
+- الأسعار والمخزون والأسماء: من الكتالوج حرفياً.
 
-تعليمات صاحب المتجر (ما لم تخالف الكتالوج):
+${salesPersona}
+
+${salesPlaybook}
+
+تعليمات صاحب المتجر (ما لم تخالف الكتالوج أو قواعد الإغلاق):
 ${ownerPrompt}${channelBlock ? `\n\n${channelBlock}` : ""}${memoryBlock}${followupsBlock}`,
         },
         {
@@ -297,6 +400,8 @@ ${catalogText}`,
 module.exports = {
   generateStoreChatReply,
   resolveChatModel,
+  resolveSalesMode,
   parseAiChatEnvelope,
   buildCatalogText,
+  EMERGENCY_HANDOFF_REPLY,
 };
