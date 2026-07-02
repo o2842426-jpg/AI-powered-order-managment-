@@ -12,6 +12,8 @@ const {
 const PLAN_FEATURE_MESSAGES = {
   conversations_dashboard:
     "This feature requires Growth or Pro. Upgrade your plan to use the conversations dashboard.",
+  live_order_state:
+    "هذه الميزة متوفرة في باقة Growth فما فوق. ارفع باقتك الحين لكي تشوف حالة الطلبات الحية!",
   human_takeover:
     "This feature requires Growth or Pro. Upgrade your plan to use human takeover (manual replies in customer chats).",
   customer_memory:
@@ -65,6 +67,12 @@ function requirePlanFeature(featureKey) {
         feature: featureKey,
         plan_tier: tier,
         message,
+        ...(featureKey === "live_order_state"
+          ? {
+              error:
+                "هذه الميزة متوفرة في باقة Growth فما فوق. ارفع باقتك الحين لكي تشوف حالة الطلبات الحية!",
+            }
+          : {}),
       });
     }
 

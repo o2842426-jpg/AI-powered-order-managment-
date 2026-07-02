@@ -559,6 +559,15 @@ function getChannelConversationForStore(conversationId, storeId) {
             last_customer_message_at,
             status,
             metadata,
+            order_state,
+            order_product_id,
+            order_product_name,
+            customer_city AS order_customer_city,
+            customer_phone AS order_customer_phone,
+            customer_name AS order_customer_name,
+            customer_address AS order_customer_address,
+            payment_method AS order_payment_method,
+            buy_committed,
             created_at,
             updated_at
           FROM channel_conversations

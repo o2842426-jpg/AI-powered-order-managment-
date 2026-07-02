@@ -13,6 +13,47 @@ const {
   listChannelMessagesForStore,
   getInstagramConnectionForStore,
 } = require("./channel.repository");
+const {
+  mapOrderStateFromRow,
+  formatOrderStateForApi,
+} = require("./orderState.api");
+
+function withOrderStateForStore(conversation, storeId, allowOrderState) {
+  if (!conversation || !allowOrderState) {
+    const { order_state, order_product_id, order_product_name, order_customer_city, order_customer_phone, order_customer_name, order_customer_address, order_payment_method, buy_committed, ...rest } =
+      conversation;
+    return rest;
+  }
+
+  const state = formatOrderStateForApi(
+    mapOrderStateFromRow({
+      order_state: conversation.order_state,
+      order_product_id: conversation.order_product_id,
+      order_product_name: conversation.order_product_name,
+      customer_city: conversation.order_customer_city,
+      customer_phone: conversation.order_customer_phone,
+      customer_name: conversation.order_customer_name,
+      customer_address: conversation.order_customer_address,
+      payment_method: conversation.order_payment_method,
+      buy_committed: conversation.buy_committed,
+    })
+  );
+
+  const {
+    order_customer_city,
+    order_customer_phone,
+    order_customer_name,
+    order_customer_address,
+    order_payment_method,
+    buy_committed,
+    ...rest
+  } = conversation;
+
+  return {
+    ...rest,
+    order: state,
+  };
+}
 
 /**
  * GET /api/stores/:storeId/channel-conversations
@@ -62,6 +103,15 @@ function listChannelConversations(req, res) {
             cc.created_at,
             cc.created_at AS started_at,
             cc.status,
+            cc.order_state,
+            cc.order_product_id,
+            cc.order_product_name,
+            cc.customer_city AS order_customer_city,
+            cc.customer_phone AS order_customer_phone,
+            cc.customer_name AS order_customer_name,
+            cc.customer_address AS order_customer_address,
+            cc.payment_method AS order_payment_method,
+            cc.buy_committed,
             c.name AS customer_name,
             c.phone AS customer_phone,
             (
@@ -94,7 +144,10 @@ function listChannelConversations(req, res) {
       .all(...params);
 
     const allowLeadScoring = storeHasFeature(storeId, "lead_scoring");
-    const data = rows.map((row) => sanitizeLeadScoreRow(row, allowLeadScoring));
+    const allowOrderState = storeHasFeature(storeId, "live_order_state");
+    const data = rows.map((row) =>
+      sanitizeLeadScoreRow(withOrderStateForStore(row, storeId, allowOrderState), allowLeadScoring)
+    );
 
     return res.status(200).json({ data });
   } catch (error) {
@@ -127,15 +180,20 @@ function getChannelConversationDetail(req, res) {
 
     const messages = listChannelMessagesForStore(conversationId, 500);
     const allowLeadScoring = storeHasFeature(storeId, "lead_scoring");
+    const allowOrderState = storeHasFeature(storeId, "live_order_state");
 
     return res.status(200).json({
       data: {
         conversation: sanitizeLeadScoreRow(
-          {
-            ...conversation,
-            started_at: conversation.created_at,
-            channel: conversation.platform,
-          },
+          withOrderStateForStore(
+            {
+              ...conversation,
+              started_at: conversation.created_at,
+              channel: conversation.platform,
+            },
+            storeId,
+            allowOrderState
+          ),
           allowLeadScoring
         ),
         messages,

@@ -27,6 +27,7 @@ const FEATURE_MIN_TIER = {
   basic_analytics: "trial",
   simple_ai_personality: "trial",
   conversations_dashboard: "growth",
+  live_order_state: "growth",
   advanced_analytics: "growth",
   human_takeover: "growth",
   smart_product_suggestions: "growth",

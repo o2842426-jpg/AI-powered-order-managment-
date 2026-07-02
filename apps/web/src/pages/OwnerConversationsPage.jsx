@@ -45,6 +45,90 @@ function getMessageImageUrls(message) {
   return urls.map((url) => mediaUrl(url)).filter(Boolean);
 }
 
+const ORDER_STATE_BADGE_CLASS = {
+  AWAITING_PRODUCT: "is-product",
+  AWAITING_LOCATION: "is-location",
+  AWAITING_PHONE: "is-phone",
+  CONFIRMED_AWAITING_FINALIZE: "is-confirmed",
+};
+
+function OrderStateBadge({ order }) {
+  if (!order?.order_state) return null;
+  const state = order.order_state;
+  const cls = ORDER_STATE_BADGE_CLASS[state] || "is-product";
+  return (
+    <span className={`owner-conv__order-badge ${cls}`} title={state}>
+      {order.order_state_label_ar || state}
+    </span>
+  );
+}
+
+function OrderStateField({ label, value, saved }) {
+  return (
+    <div className={`owner-conv__order-field${saved ? " is-saved" : " is-missing"}`}>
+      <span className="owner-conv__order-field-label">{label}</span>
+      <span className="owner-conv__order-field-value" dir="auto">
+        {value || "—"}
+      </span>
+      {saved ? <span className="owner-conv__order-field-tag">محفوظ</span> : null}
+    </div>
+  );
+}
+
+function OrderStateSidebar({ order }) {
+  if (!order) return null;
+
+  return (
+    <aside className="owner-conv__order-sidebar" aria-label="حالة الطلب الحية">
+      <div className="owner-conv__order-sidebar-head">
+        <h3>حالة الطلب الحية</h3>
+        <OrderStateBadge order={order} />
+        <p className="owner-conv__order-sidebar-code">{order.order_state}</p>
+      </div>
+      <p className="owner-conv__order-sidebar-hint">
+        الحقول أدناه يستخرجها الـ AI من المحادثة — تتحدّث تلقائياً مع كل رسالة.
+      </p>
+      <div className="owner-conv__order-fields">
+        <OrderStateField
+          label="المنتج المستهدف"
+          value={order.order_product_name}
+          saved={Boolean(order.order_product_name)}
+        />
+        <OrderStateField
+          label="المحافظة"
+          value={order.customer_city}
+          saved={Boolean(order.customer_city)}
+        />
+        <OrderStateField
+          label="العنوان التفصيلي"
+          value={order.customer_address}
+          saved={Boolean(order.customer_address)}
+        />
+        <OrderStateField
+          label="اسم المستلم"
+          value={order.customer_name}
+          saved={Boolean(order.customer_name)}
+        />
+        <OrderStateField
+          label="رقم الهاتف"
+          value={order.customer_phone}
+          saved={Boolean(order.customer_phone)}
+        />
+        <OrderStateField
+          label="طريقة الدفع"
+          value={order.payment_method_label_ar}
+          saved={Boolean(order.payment_method)}
+        />
+        <OrderStateField
+          label="نية الشراء"
+          value={order.buy_committed ? "نعم — الزبون أبدى رغبة شراء" : "لم يُثبَّت بعد"}
+          saved={Boolean(order.buy_committed)}
+        />
+      </div>
+    </aside>
+  );
+}
+
 export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
   const storeId = getOwnerStoreIdFromAuth();
   const caps = billingStatus?.capabilities;
@@ -57,6 +141,9 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
   const canLeadScoring =
     !billingStatus?.billing_enforced ||
     (Array.isArray(caps) && caps.includes("lead_scoring"));
+  const canLiveOrderState =
+    !billingStatus?.billing_enforced ||
+    (Array.isArray(caps) && caps.includes("live_order_state"));
   const [followupTasks, setFollowupTasks] = useState([]);
   const [followupTasksLoading, setFollowupTasksLoading] = useState(false);
   const [followupTasksError, setFollowupTasksError] = useState("");
@@ -525,6 +612,9 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                       {Number(row.owner_takeover) === 1 ? (
                         <span className="owner-conv__takeover-pill">يدوي</span>
                       ) : null}
+                      {canLiveOrderState && row.order ? (
+                        <OrderStateBadge order={row.order} />
+                      ) : null}
                       {canLeadScoring &&
                       row.lead_score != null &&
                       row.lead_score !== "" ? (
@@ -577,7 +667,12 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                 </div>
               ) : null}
               <div className="owner-conv__detail-head">
-                <h2>محادثة إنستغرام #{detail.conversation.id}</h2>
+                <h2>
+                  محادثة إنستغرام #{detail.conversation.id}
+                  {canLiveOrderState && detail.conversation.order ? (
+                    <OrderStateBadge order={detail.conversation.order} />
+                  ) : null}
+                </h2>
                 <p className="owner-conv__detail-sub">
                   بدأت {formatDt(detail.conversation.started_at || detail.conversation.created_at)}
                   {detail.conversation.last_message_at
@@ -648,6 +743,24 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                   </p>
                 ) : null}
               </div>
+              <div className="owner-conv__detail-body">
+                {canLiveOrderState && detail.conversation.order ? (
+                  <OrderStateSidebar order={detail.conversation.order} />
+                ) : billingStatus?.billing_enforced ? (
+                  <aside className="owner-conv__order-sidebar owner-conv__order-sidebar--gate">
+                    <p>
+                      حالة الطلبات الحية متوفرة في باقة <strong>Growth</strong> فما فوق.
+                    </p>
+                    <button
+                      type="button"
+                      className="dm-btn dm-btn--ghost dm-btn--sm"
+                      onClick={() => onGoUpgrade?.()}
+                    >
+                      ترقية الخطة
+                    </button>
+                  </aside>
+                ) : null}
+                <div className="owner-conv__detail-main">
               <ul className="owner-conv__thread">
                 {(detail.messages || []).map((m) => {
                   const imageUrls = getMessageImageUrls(m);
@@ -742,6 +855,8 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                   </button>
                 </div>
               </form>
+                </div>
+              </div>
             </>
           )}
         </section>
