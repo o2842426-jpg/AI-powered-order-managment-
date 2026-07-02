@@ -26,6 +26,11 @@ const {
   getProductImagePaths,
   MAX_DM_IMAGES_PER_MESSAGE,
 } = require("../../lib/productImages");
+const {
+  detectConversationPhase,
+  productImagesAlreadySent,
+  summarizeCheckoutContext,
+} = require("./conversationPhase");
 
 /**
  * Append product names only — no store URLs (Instagram DM stays in-chat).
@@ -296,6 +301,15 @@ async function processChannelAiReply({
       .all(store.id);
   }
 
+  const fullHistory = history;
+  const phase = detectConversationPhase(fullHistory, currentText);
+  const checkoutContext = summarizeCheckoutContext(fullHistory, currentText);
+  const imagesSent = productImagesAlreadySent(fullHistory);
+
+  console.info(
+    `[channel-ai] phase=${phase} imagesSent=${imagesSent} missing=${checkoutContext.missing.join("|") || "none"}`
+  );
+
   const aiResult = await generateStoreChatReply({
     store,
     products,
@@ -305,17 +319,22 @@ async function processChannelAiReply({
     followups,
     channelContext: "instagram_dm",
     customerImageUrls: imageUrls,
+    conversationPhase: phase,
+    checkoutContext,
   });
 
-  const recommendedIds = Array.isArray(aiResult.recommended_product_ids)
+  let recommendedIds = Array.isArray(aiResult.recommended_product_ids)
     ? aiResult.recommended_product_ids
     : [];
 
-  const replyText = appendProductNamesForDm(
-    aiResult.reply,
-    products,
-    recommendedIds
-  );
+  if (phase === "checkout" || imagesSent) {
+    recommendedIds = [];
+  }
+
+  const replyText =
+    phase === "checkout"
+      ? aiResult.reply
+      : appendProductNamesForDm(aiResult.reply, products, recommendedIds);
 
   const payload = { recommended_product_ids: recommendedIds };
 
@@ -355,7 +374,10 @@ async function processChannelAiReply({
     payload,
   });
 
-  const productImageUrls = collectDmProductImageUrls(products, recommendedIds);
+  const productImageUrls =
+    phase === "checkout" || imagesSent
+      ? []
+      : collectDmProductImageUrls(products, recommendedIds);
   if (productImageUrls.length) {
     const imgResult = await sendInstagramImagesWithEncryptedToken({
       connection,

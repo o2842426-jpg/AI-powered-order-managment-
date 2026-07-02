@@ -122,14 +122,17 @@ function buildConversationMessages(conversationMessages, messageText, customerIm
   return mapped;
 }
 
-function buildChannelContextBlock(channelContext, salesMode) {
+function buildChannelContextBlock(channelContext, salesMode, phase) {
   if (channelContext === "instagram_dm") {
     const igClose =
-      salesMode === "aggressive"
+      phase === "checkout"
         ? `
-- في DM: أول ما يظهر اهتمام (سعر، توفر، صورة، «هذا»، «مثل هذي») ضع product_id في recommended_product_ids فورًا — الصور تنرسل تلقائيًا وتقوي الإغلاق.
-- قل «راح أرسلك الصور الحين بالخاص» أو «شوف الصور اللي راح توصلك» — لا روابط.`
-        : `
+- مرحلة إتمام الطلب: لا ترسل صور ولا recommended_product_ids. اجمع بيانات التوصيل فقط.`
+        : salesMode === "aggressive"
+          ? `
+- في الاكتشاف: عند أول اهتمام بمنتج ضع product_id في recommended_product_ids مرة واحدة — الصور تنرسل تلقائياً.
+- بعد ما يقول «أريد أشتري/ثبت/كمل» لا تعيد الصور ولا المنتجات المقترحة.`
+          : `
 - عند طلب صور أو اقتراح منتجات، ضع المعرفات في recommended_product_ids — النظام يرسل الصور في المحادثة.`;
     return `
 قناة المحادثة: Instagram DM (داخل التطبيق فقط).
@@ -175,17 +178,28 @@ function buildOwnerPrompt(store) {
 const EMERGENCY_HANDOFF_REPLY =
   "تدلل عيني، هذي الصورة ما واضحة عندي بـ سيستم المخزن الحين. ثواني وراح يحولك النظام للموظف المختص حتى يشوفها بـ عيونه ويخدمك ويرتبلك الطلب. انتظرني لحظة فدوة لقلبك.";
 
-function buildExecutiveSalesPersonaBlock(storeName, salesMode) {
+function buildExecutiveSalesPersonaBlock(storeName, salesMode, phase) {
   const brand = String(storeName || "المتجر").trim();
+
+  if (phase === "checkout") {
+    return `
+# هوية المندوب — مرحلة إتمام الطلب
+- أنت موظف استقبال طلبات لـ "${brand}" — هادئ، دقيق، بشري.
+- الزبون قرر يشتري: مهمتك جمع بيانات التوصيل وتأكيد الطلب، مو إقناع من جديد.
+- ممنوع: upsell، صور، إعادة عرض المنتج، CTA مبيعات، «تحب نثبت؟».
+- اسأل عن: الاسم، الهاتف، العنوان، الدفع — فقط ما ينقص.
+- إذا قال «شنو هو؟» بعد سؤالك — وضّح شنو البيانات الناقصة (مثلاً رقم الهاتف)، مو تعيد وصف المنتج.
+`.trim();
+  }
 
   const intensity =
     salesMode === "aggressive"
       ? `
-شدة الإغلاق: عالية — أنت Closer محترف. الزبون من أول رسالة «بإيدك». لا تتركه يتفرج؛ كل رد يقربه خطوة للشراء.
-- ممنوع نهائياً: «من دواعي سروري»، «اختيارك ممتاز»، «يسعدني خدمتك»، الفصحى الثقيلة، أو إنهاء الرد بنقطة بدون سؤال.
-- كل رد = 3 طبقات: (1) جواب مباشر (2) ميزة/استعجال حقيقي من الكتالوج (3) سؤال إغلاق بخيارين كلاهما لصالحك.
-- استخدم: عيني، عيوني، غالي، تدلل، على راسي، يوصل لباب البيت، تفحصه وياك كاش، متوفر، خادم.
-- افترض أن الزبون جاي يشتري؛ اسأل «نثبت الحجز؟» مو «تحب تشتري؟».`
+شدة الإغلاق: عالية — Closer محترف في مرحلة الاكتشاف والعرض فقط.
+- ممنوع: «من دواعي سروري»، «اختيارك ممتاز»، الفصحى الثقيلة.
+- كل رد اكتشاف = (1) جواب مباشر (2) ميزة قصيرة (3) CTA بخيارين.
+- استخدم: عيني، غالي، تدلل، على راسي، كاش عند الاستلام.
+- CTA فقط قبل أن يقول الزبون «أريد أشتري/ثبت/كمل» — بعدها انتقل لبروتوكول Checkout.`
       : salesMode === "soft"
         ? `
 شدة الإغلاق: لطيفة — ودود ومساعد، CTA خفيف بدون ضغط زائد.`
@@ -202,7 +216,7 @@ ${intensity}
 # قواعد الحوار الذهبية
 1. سعر/توفر/«بيش»/«متوفر»/«هذا» → السعر والتوفر في السطر الأول حرفياً من الكتالوج.
 2. بعدها ميزة واحدة قصيرة (جودة، فحص بباب البيت، توصيل سريع، مخزون منخفض إن كان stock_qty قليل في الكتالوج).
-3. اختم بسؤال CTA بخيارين: مثال «نثبتلك قطعة وتوصل باجر الصبح، لو تدزلي محافظتك أحسبلك التوصيل أول؟»
+3. في الاكتشاف فقط: اختم بسؤال CTA بخيارين. في Checkout: لا CTA — اطلب بيانات ناقصة فقط.
 4. اعتراض «غالي»: «على راسي عيوني، الغالي للغالي — بس هذي درجة أولى وتعيش وياك وتوصل لباب البيت وتفحصه يلا تدفع كاش. تحب نثبتلك قطعة قبل ما تخلص؟»
 5. تحية فقط → رد قصير دافئ + اسأل شنو يدور عليه + اقترح منتج من الكتالوج إن مناسب.
 
@@ -220,7 +234,27 @@ ${intensity}
 `.trim();
 }
 
-function buildSalesPlaybookBlock(salesMode) {
+function buildSalesPlaybookBlock(salesMode, phase) {
+  if (phase === "checkout") {
+    return `
+# Playbook إتمام الطلب (Checkout) — أنت هنا الآن
+- الزبون يريد يشتري أو أعطى بيانات توصيل/دفع: لا ترجع لمرحلة العرض.
+- ممنوع: upsell، منتج ثاني، إعادة وصف المنتج، إعادة السعر، «تحب نثبت؟» بعد ما قال نعم.
+- ممنوع: CTA بخيارين — اسأل فقط عن البيانات الناقصة (حقل أو حقلين بكل رسالة).
+- recommended_product_ids يجب أن تكون [] دائماً في هذه المرحلة.
+- اقرأ المحادثة ولا تعيد سؤال عن معلومة قالها الزبون (محافظة، كاش، تأكيد شراء).
+- عند اكتمال البيانات: لخّص الطلب (منتج، سعر، عنوان، هاتف، دفع) وقل إن الطلب تثبّت وراح يتواصل فريق التوصيل.
+`.trim();
+  }
+
+  if (phase === "objection") {
+    return `
+# Playbook اعتراض
+- عالج الاعتراض بجملة واحدة ثم CTA بخيارين لإرجاعه للشراء.
+- لا upsell منتج مختلف عن اللي يسأل عنه.
+`.trim();
+  }
+
   if (salesMode === "soft") {
     return `
 # Playbook مختصر
@@ -230,12 +264,45 @@ function buildSalesPlaybookBlock(salesMode) {
   }
 
   return `
-# Playbook الإغلاق (استخدمه كل مرة)
-- أي سؤال عن منتج → ضع product_id في recommended_product_ids (حتى يشوف الصور ويتعلق).
+# Playbook الاكتشاف والعرض
+- أي سؤال عن منتج جديد → ضع product_id في recommended_product_ids (مرة واحدة لعرض الصور).
 - مخزون variant ≤ 3 → اذكر «باقي عدد محدود» (فقط إذا الرقم حقيقي في الكتالوج).
-- بعد عرض منتج → «تحب نفس اللون لو نشوف لون ثاني متوفر؟» أو «نثبت مقاسك ولا تريد تشوف القياسات الباقية؟»
-- قبل الخروج من المحادثة → «باقي شي واحد يخليني أرتبلك الطلب؟»
-- لا تترك رداً بدون سؤال استفهام في النهاية — بدون استثناء.
+- بعد عرض منتج → سؤال CTA بخيارين.
+- CTA فقط في الاكتشاف أو الاعتراض — مو أثناء إتمام الطلب.
+`.trim();
+}
+
+function buildCheckoutProtocolBlock(checkoutContext) {
+  const missing =
+    checkoutContext?.missing?.length > 0
+      ? checkoutContext.missing.join("، ")
+      : "لا شيء — لخّص الطلب وأكد التثبيت";
+
+  const hasLines = [];
+  const h = checkoutContext?.has || {};
+  if (h.confirmed_buy) hasLines.push("أبدى رغبة شراء/تثبيت");
+  if (h.governorate) hasLines.push("ذكر المحافظة");
+  if (h.address) hasLines.push("ذكر عنوان");
+  if (h.payment_cod) hasLines.push("كاش عند الاستلام");
+  if (h.phone) hasLines.push("ذكر هاتف");
+  if (h.name) hasLines.push("ذكر اسم");
+
+  return `
+# بروتوكول إتمام الطلب (إلزامي — أولوية على كل القواعد الأخرى)
+الزبون في مرحلة الشراء. تصرف كموظف استقبال طلبات بشري، مو روبوت مبيعات.
+
+ما يعرفه النظام من المحادثة:
+${hasLines.length ? hasLines.map((l) => `- ${l}`).join("\n") : "- لا بيانات محفوظة بعد"}
+
+اطلب فقط ما ينقص: ${missing}
+
+قواعد الرد في Checkout:
+1. جملة تأكيد قصيرة لما اتفق عليه (منتج + سعر + توصيل إن معروف).
+2. اطلب **حقلاً واحداً أو اثنين ناقصين** فقط — مثال: «دزلي اسمك الثلاثي ورقم تلفونك للتوصيل.»
+3. ممنوع إنهاء الرد بـ «تحب نثبت؟» أو «تحب أكمل؟» إذا قال أصلاً ثبت/كمل/اشتري.
+4. ممنوع اقتراح منتج آخر أو زجاجة/إكسسوار إضافي.
+5. recommended_product_ids = [] دائماً.
+6. لا تقل «انتظرني لحظة» بدون طلب بيانات محددة في نفس الرسالة.
 `.trim();
 }
 
@@ -366,6 +433,8 @@ async function generateStoreChatReply({
   followups = [],
   channelContext = null,
   customerImageUrls = [],
+  conversationPhase = "discovery",
+  checkoutContext = null,
 }) {
   const allowedProductIds = new Set(
     (products || []).map((p) => Number(p.id)).filter((n) => Number.isInteger(n) && n > 0)
@@ -377,13 +446,16 @@ async function generateStoreChatReply({
   }
 
   const salesMode = resolveSalesMode();
+  const phase = conversationPhase || "discovery";
   const catalogText = buildCatalogText(products, store?.currency_code);
   const ownerPrompt = buildOwnerPrompt(store);
-  const salesPersona = buildExecutiveSalesPersonaBlock(store?.name, salesMode);
-  const salesPlaybook = buildSalesPlaybookBlock(salesMode);
+  const salesPersona = buildExecutiveSalesPersonaBlock(store?.name, salesMode, phase);
+  const salesPlaybook = buildSalesPlaybookBlock(salesMode, phase);
+  const checkoutBlock =
+    phase === "checkout" ? buildCheckoutProtocolBlock(checkoutContext) : "";
   const memoryBlock = buildMemoryFactsBlock(memoryFacts);
   const followupsBlock = buildFollowupsBlock(followups);
-  const channelBlock = buildChannelContextBlock(channelContext, salesMode);
+  const channelBlock = buildChannelContextBlock(channelContext, salesMode, phase);
   const visionMode = Array.isArray(customerImageUrls) && customerImageUrls.length > 0;
   const historyMessages = buildConversationMessages(
     conversationMessages,
@@ -406,16 +478,24 @@ async function generateStoreChatReply({
     : "";
 
   const recommendAggressive =
-    salesMode === "aggressive"
+    salesMode === "aggressive" && phase === "discovery"
       ? `
-- في وضع المبيعات القوي: أي إشارة شراء (سعر، توفر، صورة، «عندكم»، «شنو تنصح»، لون، مقاس، «أريد»، «أبي») → ضع على الأقل product_id واحد في recommended_product_ids إن وُجد مطابق في الكتالوج.
-- التحية الأولى مع استكشاف → اقترح 1–2 منتجات من الكتالوج إن أمكن.`
-      : "";
+- في وضع المبيعات القوي (اكتشاف فقط): أي إشارة شراء أولى (سعر، توفر، صورة) → ضع product_id في recommended_product_ids مرة واحدة لعرض الصور.
+- بعد أن يقول الزبون «أريد أشتري/ثبت/كمل» → recommended_product_ids=[] ولا ترسل صور مجدداً.`
+      : phase === "checkout"
+        ? `
+- مرحلة Checkout: recommended_product_ids يجب أن تكون [] دائماً.`
+        : "";
+
+  const replyEndRule =
+    phase === "checkout"
+      ? "ينتهي بطلب بيانات توصيل محددة (اسم/هاتف/عنوان) — بدون CTA مبيعات"
+      : "ينتهي بسؤال CTA في مرحلة الاكتشاف";
 
   const jsonInstructions = `
 أجب دائمًا بجسم JSON صالح فقط (بدون نص خارج JSON)، بالشكل التالي بالضبط:
 {
-  "reply": "نص عربي طبيعي للعميل — لهجة عراقية، وكل رد ينتهي بسؤال CTA",
+  "reply": "نص عربي طبيعي للعميل — لهجة عراقية، ${replyEndRule}",
   "recommended_product_ids": []${visionMode ? ',\n  "image_match_confidence": "high",\n  "needs_human_handoff": false' : ""}
 }
 ${visionJsonRules}
@@ -423,8 +503,8 @@ ${visionJsonRules}
 قواعد recommended_product_ids (مهم جدًا):
 - ضع في المصفوفة فقط أرقام product_id موجودة حرفيًا في كتالوج «بيانات المتجر والمنتجات» أدناه. لا تخترع رقمًا.
 - إذا لم يكن هناك منتج مناسب، اترك المصفوفة [] ولا تدّعي وجود منتج.
-- املأ المصفوفة عند: اقتراح، توفر، سعر منتج محدد، «شنو عندكم»، طلب صور، مقارنة، رغبة شراء، أو إرسال صورة/وصف يطابق منتجاً في الكتالوج.
-- اترك المصفوفة [] فقط لأسئلة سياسة/توصيل عام/دفع عامة بدون منتج، أو بروتوكول الطوارئ.
+- املأ المصفوفة عند: اقتراح منتج جديد في مرحلة الاكتشاف، أو أول مرة يطلب صور/سعر منتج.
+- اترك المصفوفة [] في: Checkout، بعد ما أرسلت صور المنتج سابقاً، أسئلة سياسة عامة، أو بروتوكول الطوارئ.
 - لا تذكر في reply أن منتجًا «موجود» إذا لم تضع معرفه في recommended_product_ids.
 - الحد الأقصى ${MAX_RECOMMENDED_IDS} معرفات في المصفوفة.
 ${recommendAggressive}
@@ -446,7 +526,7 @@ ${jsonInstructions}
 
 ${salesPersona}
 
-${salesPlaybook}
+${checkoutBlock ? `${checkoutBlock}\n\n` : ""}${salesPlaybook}
 
 تعليمات صاحب المتجر (ما لم تخالف الكتالوج أو قواعد الإغلاق):
 ${ownerPrompt}${channelBlock ? `\n\n${channelBlock}` : ""}${memoryBlock}${followupsBlock}`,
