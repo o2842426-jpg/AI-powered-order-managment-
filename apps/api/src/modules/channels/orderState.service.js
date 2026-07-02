@@ -173,6 +173,14 @@ function enrichOrderStateFromHistory(row, history, products = []) {
 
   return merged;
 }
+
+/**
+ * @param {number} conversationId
+ * @param {string} inboundText
+ * @param {object[]} history
+ * @param {object[]} products
+ */
+function syncOrderStateAfterInbound(conversationId, inboundText, history, products) {
   const current = getConversationOrderState(conversationId);
   let merged = enrichOrderStateFromHistory(current, history, products);
   const extracted = extractFieldsFromMessage(inboundText);
@@ -204,7 +212,11 @@ function enrichOrderStateFromHistory(row, history, products = []) {
 
   merged.order_state = computeOrderState(merged);
   saveConversationOrderState(conversationId, merged);
-function syncOrderStateAfterInbound(conversationId, inboundText, history, products) {
+  return merged;
+}
+
+/**
+ * Image throttle: block resend if product image went out in last 3 turns (~6 messages)
  * unless customer explicitly asks for photos.
  *
  * @param {{ sender_type?: string, message_text?: string, message_type?: string, payload?: string }[]} history
