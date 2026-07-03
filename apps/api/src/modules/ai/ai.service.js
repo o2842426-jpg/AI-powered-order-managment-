@@ -209,6 +209,19 @@ function buildOwnerPrompt(store) {
 const EMERGENCY_HANDOFF_REPLY =
   "تدلل عيني، هذي الصورة ما واضحة عندي بـ سيستم المخزن الحين. ثواني وراح يحولك النظام للموظف المختص حتى يشوفها بـ عيونه ويخدمك ويرتبلك الطلب. انتظرني لحظة فدوة لقلبك.";
 
+/**
+ * Vision match below 80% — handoff only, no product suggestions.
+ * @param {string} confidence
+ * @param {boolean} needsHandoff
+ */
+function isVisionHandoffTurn(confidence, needsHandoff) {
+  if (needsHandoff) {
+    return true;
+  }
+  const c = String(confidence || "").trim().toLowerCase();
+  return c !== "high";
+}
+
 function buildExecutiveSalesPersonaBlock(storeName, salesMode, phase, customerRequestedImages = false) {
   const brand = String(storeName || "المتجر").trim();
 
@@ -411,7 +424,7 @@ function parseAiChatEnvelope(raw, allowedProductIds, options = {}) {
     ? obj.recommended_product_ids
     : [];
 
-  const sanitized = [];
+  let sanitized = [];
   for (const id of rawIds) {
     const n = Number(id);
     if (!Number.isInteger(n) || n <= 0) continue;
@@ -421,10 +434,21 @@ function parseAiChatEnvelope(raw, allowedProductIds, options = {}) {
     if (sanitized.length >= MAX_RECOMMENDED_IDS) break;
   }
 
-  if (visionMode) {
-    if (needsHandoff || confidence === "none" || (confidence === "low" && !sanitized.length)) {
-      reply = EMERGENCY_HANDOFF_REPLY;
-    }
+  const visionHandoff = visionMode && isVisionHandoffTurn(confidence, needsHandoff);
+
+  if (visionHandoff) {
+    return {
+      reply: EMERGENCY_HANDOFF_REPLY,
+      recommended_product_ids: [],
+      image_match_confidence: confidence || "none",
+      needs_human_handoff: true,
+      vision_handoff: true,
+    };
+  }
+
+  if (visionMode && needsHandoff) {
+    reply = EMERGENCY_HANDOFF_REPLY;
+    sanitized = [];
   }
 
   return {
@@ -432,6 +456,7 @@ function parseAiChatEnvelope(raw, allowedProductIds, options = {}) {
     recommended_product_ids: sanitized,
     image_match_confidence: confidence || undefined,
     needs_human_handoff: needsHandoff || undefined,
+    vision_handoff: false,
   };
 }
 
@@ -525,8 +550,12 @@ async function generateStoreChatReply({
 - أضف الحقول:
   "image_match_confidence": "high" | "medium" | "low" | "none"
   "needs_human_handoff": true | false
-- إذا التطابق قوي (80%+): ضع product_id في recommended_product_ids + رد بيعي بسعر من الكتالوج.
-- إذا الصورة شخص/طبيعة/منتج غير موجود/غير واضح: needs_human_handoff=true و image_match_confidence="none" و recommended_product_ids=[] و reply يكون نص الطوارئ من التعليمات.
+- فقط إذا التطابق ≥ 80% (واضح جداً): image_match_confidence="high" + product_id في recommended_product_ids + رد بيعي بسعر من الكتالوج.
+- إذا التطابق أقل من 80% أو medium/low/none أو منتج غير موجود أو صورة غير واضحة:
+  needs_human_handoff=true و image_match_confidence="none" أو "low" و recommended_product_ids=[] حصرياً.
+  reply يجب أن يكون النص الحرفي التالي فقط بدون أي إضافة أو منتج بديل:
+  "${EMERGENCY_HANDOFF_REPLY}"
+- ممنوع في حالة الفشل: اقتراح منتج آخر، ذكر سعر، أو أي نص بيعي.
 `
     : "";
 
@@ -620,4 +649,5 @@ module.exports = {
   buildCatalogText,
   buildUserMessageContent,
   EMERGENCY_HANDOFF_REPLY,
+  isVisionHandoffTurn,
 };

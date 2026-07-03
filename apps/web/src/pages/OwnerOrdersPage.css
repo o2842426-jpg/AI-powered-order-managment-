@@ -129,6 +129,27 @@
   font-size: 0.8rem;
   white-space: nowrap;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.owner-orders__filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.owner-orders__filters button.is-active .owner-orders__filter-badge {
+  background: var(--dm-color-primary, #6d5ef9);
 }
 
 .owner-orders__filters button.is-active {

@@ -23,6 +23,7 @@ const {
   saveConversationOrderState,
   getConversationOrderState,
   getConversationLinkedOrderId,
+  resetConversationOrderCanvas,
 } = require("./channel.repository");
 const { resolvePublicMediaUrl } = require("../../lib/publicMediaUrl");
 const {
@@ -325,7 +326,7 @@ async function processChannelAiReply({
   const checkoutContext = orderStateToCheckoutContext(orderState);
   const orderStateBlock = buildDynamicOrderStateBlock(orderState);
   const customerRequestedImages = customerExplicitlyRequestsImages(currentText);
-  const attachImages = shouldAttachProductImages(
+  let attachImages = shouldAttachProductImages(
     fullHistory,
     currentText,
     orderState.order_state
@@ -354,7 +355,16 @@ async function processChannelAiReply({
     ? aiResult.recommended_product_ids
     : [];
 
-  if (!attachImages) {
+  const visionHandoff = Boolean(
+    aiResult.vision_handoff ||
+      aiResult.needs_human_handoff ||
+      (imageUrls.length > 0 && aiResult.image_match_confidence !== "high")
+  );
+
+  if (visionHandoff) {
+    recommendedIds = [];
+    attachImages = false;
+  } else if (!attachImages) {
     recommendedIds = [];
   } else if (!recommendedIds.length && orderState.order_product_id) {
     recommendedIds = [Number(orderState.order_product_id)];
@@ -380,8 +390,9 @@ async function processChannelAiReply({
     }
   }
 
-  let replyText =
-    phase === "checkout"
+  let replyText = visionHandoff
+    ? aiResult.reply
+    : phase === "checkout"
       ? aiResult.reply
       : appendProductNamesForDm(aiResult.reply, products, recommendedIds);
 
@@ -407,6 +418,19 @@ async function processChannelAiReply({
       console.info(
         `[channel-ai] order persisted conversation=${conversationId} order_id=${orderResult.order_id}`
       );
+      setImmediate(() => {
+        try {
+          resetConversationOrderCanvas(conversationId);
+          console.info(
+            `[channel-ai] order canvas reset conversation=${conversationId} after order=${orderResult.order_id}`
+          );
+        } catch (err) {
+          console.error(
+            `[channel-ai] order canvas reset failed conversation=${conversationId}:`,
+            err?.message || err
+          );
+        }
+      });
     }
   }
 

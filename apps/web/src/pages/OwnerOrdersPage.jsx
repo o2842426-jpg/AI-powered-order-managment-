@@ -34,6 +34,14 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [statusCounts, setStatusCounts] = useState({
+    all: 0,
+    new: 0,
+    confirmed: 0,
+    shipped: 0,
+    delivered: 0,
+    cancelled: 0,
+  });
   const [internalSearch, setInternalSearch] = useState('');
   const controlled = typeof onSearchChange === 'function';
   const searchTerm = controlled ? (controlledSearch ?? '') : internalSearch;
@@ -109,10 +117,15 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
         return;
       }
       const url = `/api/orders?store_id=${encodeURIComponent(storeId)}`;
+      const countsUrl = `/api/orders/status-counts?store_id=${encodeURIComponent(storeId)}`;
 
       try {
-        const res = await authFetch(url);
+        const [res, countsRes] = await Promise.all([
+          authFetch(url),
+          authFetch(countsUrl),
+        ]);
         const body = await res.json().catch(() => ({}));
+        const countsBody = await countsRes.json().catch(() => ({}));
 
         if (!res.ok) {
           throwIfNotOk(res, body, { fallback: 'تعذّر تحميل الطلب.' });
@@ -120,6 +133,9 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
 
         if (!cancelled) {
           setOrders(Array.isArray(body.data) ? body.data : []);
+          if (countsRes.ok && countsBody?.data) {
+            setStatusCounts((prev) => ({ ...prev, ...countsBody.data }));
+          }
         }
       } catch (e) {
         if (!cancelled) {
@@ -487,7 +503,10 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
           </label>
         )}
         <div className="owner-orders__filters">
-          {['all', ...ORDER_STATUSES].map((status) => (
+          {['all', ...ORDER_STATUSES].map((status) => {
+            const count =
+              status === 'all' ? statusCounts.all : statusCounts[status] ?? 0;
+            return (
             <button
               key={status}
               type="button"
@@ -495,8 +514,14 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
               onClick={() => setStatusFilter(status)}
             >
               {STATUS_LABELS[status] ?? status}
+              {count > 0 ? (
+                <span className="owner-orders__filter-badge" aria-label={`${count} طلب`}>
+                  +{count}
+                </span>
+              ) : null}
             </button>
-          ))}
+            );
+          })}
         </div>
       </section>
 

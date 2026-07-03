@@ -1319,6 +1319,16 @@ export function OwnerDashboardPage({
                 <div>
                   <span>طلبات جديدة</span>
                   <small>تحتاج متابعة</small>
+                  {summary.order_status_counts?.confirmed > 0 ? (
+                    <small className="owner-dashboard__status-pill">
+                      مؤكد +{summary.order_status_counts.confirmed}
+                    </small>
+                  ) : null}
+                  {summary.order_status_counts?.shipped > 0 ? (
+                    <small className="owner-dashboard__status-pill owner-dashboard__status-pill--ship">
+                      شحن +{summary.order_status_counts.shipped}
+                    </small>
+                  ) : null}
                 </div>
                 <strong>{summary.new_orders}</strong>
               </div>

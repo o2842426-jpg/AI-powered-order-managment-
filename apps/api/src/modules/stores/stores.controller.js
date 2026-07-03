@@ -2,6 +2,7 @@ const { db } = require("../../db/client");
 const { computeStoreAnalytics } = require("../analytics/storeAnalytics.service");
 const { assertStoreScope } = require("./storeScope");
 const { storeHasFeature } = require("../plans/planEntitlements");
+const { getOrderStatusCountsForStore } = require("../orders/orders.statusCounts.service");
 
 const STORE_CURRENCY_CODES = new Set(["SAR", "IQD", "USD"]);
 
@@ -199,11 +200,14 @@ function getStoreSummary(req, res) {
       advanced: storeHasFeature(storeId, "advanced_analytics"),
     });
 
+    const orderStatusCounts = getOrderStatusCountsForStore(storeId);
+
     return res.status(200).json({
       data: {
         total_products: productStats.total_products || 0,
         active_products: productStats.active_products || 0,
         new_orders: newOrders.count || 0,
+        order_status_counts: orderStatusCounts,
         low_stock_variants: lowStock.count || 0,
         latest_order: latestOrder || null,
         analytics,
