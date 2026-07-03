@@ -225,6 +225,16 @@ function isVisionHandoffTurn(confidence, needsHandoff) {
 function buildExecutiveSalesPersonaBlock(storeName, salesMode, phase, customerRequestedImages = false) {
   const brand = String(storeName || "المتجر").trim();
 
+  if (phase === "objection") {
+    return `
+# هوية المندوب — معالجة اعتراض وإغلاق عراقي
+- أنت Closer بشري لـ "${brand}" — دافئ، واثق جداً، **جملتين إلى ثلاث بالكثير**.
+- ممنوع منعاً باتاً: «أفهم شعورك»، «الحقيبة تستحق السعر»، «نقدّر مخاوفك»، أي فصحى مؤسساتية أو روبوتية.
+- **قفل الأمان (إلزامي):** ذكّر الزبون إنه يفحص المنتج بباب البيت بعينه قبل ما يدفع كاش — وإذا مو نفس الصورة يرجّعه ببلاش.
+- لا تطوّل، لا تشرح كتالوج من جديد — عالج الخوف أو السعر ثم CTA بخيارين للتثبيت.
+`.trim();
+  }
+
   if (phase === "checkout" && !customerRequestedImages) {
     return `
 # هوية المندوب — مرحلة إتمام الطلب
@@ -261,7 +271,7 @@ ${intensity}
 1. سعر/توفر/«بيش»/«متوفر»/«هذا» → السعر والتوفر في السطر الأول حرفياً من الكتالوج.
 2. بعدها ميزة واحدة قصيرة (جودة، فحص بباب البيت، توصيل سريع، مخزون منخفض إن كان stock_qty قليل في الكتالوج).
 3. في الاكتشاف فقط: اختم بسؤال CTA بخيارين. في Checkout: لا CTA — اطلب بيانات ناقصة فقط.
-4. اعتراض «غالي»: «على راسي عيوني، الغالي للغالي — بس هذي درجة أولى وتعيش وياك وتوصل لباب البيت وتفحصه يلا تدفع كاش. تحب نثبتلك قطعة قبل ما تخلص؟»
+4. اعتراض سعر/خوف/تردد → اتبع بلوك «معالجة الاعتراض العراقي» أدناه (مو جمل مؤسساتية).
 5. تحية فقط → رد قصير دافئ + اسأل شنو يدور عليه + اقترح منتج من الكتالوج إن مناسب.
 
 # مطابقة الصورة / الموديل (بدون تخمين)
@@ -275,6 +285,39 @@ ${intensity}
 - لا روابط خارجية.
 - لا «تم التعرف على الصورة بنجاح» — تتصرف كإنسان يشوف الشاشة.
 - لا تؤكد طلباً نهائياً من عندك؛ قل «نثبت الحجز» / «أرتبلك الطلب» وخلي التأكيد عملية.
+`.trim();
+}
+
+function buildMiddleEasternObjectionBlock(messageText, phase) {
+  if (phase !== "objection") {
+    return "";
+  }
+
+  const text = String(messageText || "");
+  const hesitant =
+    /متردد|أخاف|اخاف|خاف|خايف|خايفة|شك|ماني\s*متأكد|مو\s*واثق|خايفين|ما\s*ادري/i.test(text);
+  const price = !hesitant && /غالي|غالية|غلا|سعر\s*عالي|فلوس/i.test(text);
+
+  const blueprint = hesitant
+    ? `"حقك عيوني الغالي لا تتردد، إحنا نظامنا تفحص وتشوف الحقيبة بـ باب بيتك بـ عينك وتتأكد من خامتها وجيوبها قبل ما تدفع ربع دينار للمندوب! إذا مو نفس الصورة رجعها بـ بلاش. ها عيوني، نثبت الحجز الحين؟"`
+    : price || /غالي|غالية/i.test(text)
+      ? `"غالي والطلب رخيص عيوني، بس تذكر هذي خامة أصلية ضد المي وتتحمل لابتوبك وكرف يومي، يعني تعيش وياك سنين ومو مال سوق تتقطع بـ شهر وتذبها. تشتري راحتك مرة وحدة غالي. تحب نلحق نثبتلك قطعة قبل ما تخلص الوجبة؟"`
+      : `"حقك عيوني، تفحصها بباب بيتك بعينك قبل ما تدفع كاش — إذا مو عاجبتك ترجعها ببلاش. نثبت الحجز الحين؟"`;
+
+  return `
+# معالجة الاعتراض العراقي (إلزامي — أولوية على Playbook الاكتشاف)
+الزبون متردد أو خايف أو يشتكي من السعر.
+
+قواعد صارمة:
+1. **ممنوع:** «أفهم شعورك»، «المنتج يستحق السعر»، «نقدّر اهتمامك»، أي كلام مؤسساتي.
+2. **الطول:** جملتان إلى ثلاث فقط — دافئ، واثق، بدون فقرات.
+3. **قفل الأمان:** دائماً ذكّر الفحص بباب البيت قبل الدفع كاش + الإرجاع المجاني إذا مو نفس الصورة.
+4. اختم بـ CTA بخيارين للتثبيت (ها نثبت؟ / تحب نلحق نثبتلك قطعة؟).
+5. لا upsell منتج مختلف؛ التزم بالمنتج اللي يتكلمون عنه.
+6. recommended_product_ids: [] إلا إذا طلبوا صور صراحةً.
+
+النموذج المرجعي لهذا الاعتراض (اقترب منه حرفياً — بدّل «الحقيبة» باسم المنتج من الكتالوج إن لزم):
+${blueprint}
 `.trim();
 }
 
@@ -293,9 +336,11 @@ function buildSalesPlaybookBlock(salesMode, phase) {
 
   if (phase === "objection") {
     return `
-# Playbook اعتراض
-- عالج الاعتراض بجملة واحدة ثم CTA بخيارين لإرجاعه للشراء.
-- لا upsell منتج مختلف عن اللي يسأل عنه.
+# Playbook اعتراض — إغلاق قصير
+- جملتان–ثلاث، لهجة عراقية دافئة (عيوني، غالي، عيني).
+- عالج الخوف أو السعر فوراً بقفل الأمان (فحص بباب البيت + كاش بعد التأكد).
+- CTA بخيارين للتثبيت — لا ترجع لشرح كتالوج طويل.
+- لا منتج بديل ولا upsell.
 `.trim();
   }
 
@@ -523,6 +568,7 @@ async function generateStoreChatReply({
     customerRequestedImages
   );
   const salesPlaybook = buildSalesPlaybookBlock(salesMode, phase);
+  const objectionBlock = buildMiddleEasternObjectionBlock(messageText, phase);
   const checkoutBlock =
     phase === "checkout" ? buildCheckoutProtocolBlock(checkoutContext) : "";
   const dynamicStateBlock = String(orderStateBlock || "").trim();
@@ -570,12 +616,17 @@ async function generateStoreChatReply({
       : phase === "checkout"
         ? `
 - مرحلة Checkout: recommended_product_ids يجب أن تكون [] دائماً.`
-        : "";
+        : phase === "objection"
+          ? `
+- مرحلة اعتراض: recommended_product_ids = [] — ركّز على قفل الأمان والـ CTA فقط.`
+          : "";
 
   const replyEndRule =
     phase === "checkout"
       ? "ينتهي بطلب بيانات توصيل محددة (اسم/هاتف/عنوان) — بدون CTA مبيعات"
-      : "ينتهي بسؤال CTA في مرحلة الاكتشاف";
+      : phase === "objection"
+        ? "جملتان إلى ثلاث فقط — قفل أمان (فحص بباب البيت) + CTA تثبيت"
+        : "ينتهي بسؤال CTA في مرحلة الاكتشاف";
 
   const jsonInstructions = `
 أجب دائمًا بجسم JSON صالح فقط (بدون نص خارج JSON)، بالشكل التالي بالضبط:
@@ -611,7 +662,7 @@ ${jsonInstructions}
 
 ${salesPersona}
 
-${dynamicStateBlock ? `${dynamicStateBlock}\n\n` : ""}${checkoutBlock ? `${checkoutBlock}\n\n` : ""}${salesPlaybook}
+${dynamicStateBlock ? `${dynamicStateBlock}\n\n` : ""}${objectionBlock ? `${objectionBlock}\n\n` : ""}${checkoutBlock ? `${checkoutBlock}\n\n` : ""}${salesPlaybook}
 
 تعليمات صاحب المتجر (ما لم تخالف الكتالوج أو قواعد الإغلاق):
 ${ownerPrompt}${channelBlock ? `\n\n${channelBlock}` : ""}${memoryBlock}${followupsBlock}`,

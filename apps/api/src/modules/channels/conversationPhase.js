@@ -10,7 +10,13 @@ const LOCATION_PAYMENT_SIGNALS =
   /محافظ|كركوك|بغداد|الناصر|البصر|اربيل|أربيل|سليمان|كاش\s*عند|الدفع\s*كاش|عند\s*الاستلام|عنوان\s*التوصيل|عنواني|منطقة|حي\s|قضاء|شارع/i;
 
 const OBJECTION_SIGNALS =
-  /غالي|مو\s*غالي|بعدين|خليني\s*افكر|ما\s*اريد|ما\s*أريد|لا\s*ما\s*اريد|مو\s*مهتم|بس\s*الحقيبة|بس\s*المنتج/i;
+  /غالي|غالية|غلا|متردد|أخاف|اخاف|خاف|خايف|خايفة|بعدين|خليني\s*افكر|ما\s*اريد|ما\s*أريد|لا\s*ما\s*اريد|مو\s*مهتم|مو\s*غالي|بس\s*الحقيبة|بس\s*المنتج|شك|ماني\s*متأكد|مو\s*واثق/i;
+
+const HESITANT_OBJECTION_SIGNALS =
+  /متردد|أخاف|اخاف|خاف|خايف|خايفة|شك|ماني\s*متأكد|مو\s*واثق|خايفين|ما\s*ادري/i;
+
+const PRICE_OBJECTION_SIGNALS =
+  /غالي|غالية|غلا|سعر\s*عالي|فلوس|بصرف|غالي\s*واكو|مو\s*ارخص/i;
 
 const PRODUCT_DISCUSSED =
   /سعر|د\.ع|دع\b|نثبت|حجز|حقيبة|منتج|متوفر|توصيل/i;
@@ -116,8 +122,22 @@ function summarizeCheckoutContext(history, currentText) {
   return { has, missing, customerText: customerText.slice(-1200) };
 }
 
+/**
+ * @param {string} text
+ * @returns {"hesitant" | "price" | null}
+ */
+function detectObjectionKind(text) {
+  const t = String(text || "").trim();
+  if (!t) return null;
+  if (HESITANT_OBJECTION_SIGNALS.test(t)) return "hesitant";
+  if (PRICE_OBJECTION_SIGNALS.test(t)) return "price";
+  if (OBJECTION_SIGNALS.test(t)) return "price";
+  return null;
+}
+
 module.exports = {
   detectConversationPhase,
+  detectObjectionKind,
   productImagesAlreadySent,
   summarizeCheckoutContext,
 };

@@ -40,6 +40,7 @@ const {
   computeOrderState,
 } = require("./orderState.service");
 const { buildDynamicOrderStateBlock } = require("./dynamicOrderPrompt");
+const { detectConversationPhase } = require("./conversationPhase");
 const {
   canCreateOrderFromState,
   createOrderFromConversationState,
@@ -322,7 +323,13 @@ async function processChannelAiReply({
     fullHistory,
     products
   );
-  const phase = orderStateToConversationPhase(orderState.order_state);
+  let phase = orderStateToConversationPhase(orderState.order_state);
+  if (phase !== "checkout") {
+    const heuristicPhase = detectConversationPhase(fullHistory, currentText);
+    if (heuristicPhase === "objection") {
+      phase = "objection";
+    }
+  }
   const checkoutContext = orderStateToCheckoutContext(orderState);
   const orderStateBlock = buildDynamicOrderStateBlock(orderState);
   const customerRequestedImages = customerExplicitlyRequestsImages(currentText);
@@ -333,7 +340,7 @@ async function processChannelAiReply({
   );
 
   console.info(
-    `[channel-ai] order_state=${orderState.order_state} attachImages=${attachImages} imageOverride=${customerRequestedImages} missing=${checkoutContext.missing.join("|") || "none"}`
+    `[channel-ai] phase=${phase} order_state=${orderState.order_state} attachImages=${attachImages} imageOverride=${customerRequestedImages} missing=${checkoutContext.missing.join("|") || "none"}`
   );
 
   const aiResult = await generateStoreChatReply({
@@ -364,6 +371,8 @@ async function processChannelAiReply({
   if (visionHandoff) {
     recommendedIds = [];
     attachImages = false;
+  } else if (phase === "objection" && !customerRequestedImages) {
+    recommendedIds = [];
   } else if (!attachImages) {
     recommendedIds = [];
   } else if (!recommendedIds.length && orderState.order_product_id) {
@@ -392,7 +401,7 @@ async function processChannelAiReply({
 
   let replyText = visionHandoff
     ? aiResult.reply
-    : phase === "checkout"
+    : phase === "checkout" || phase === "objection"
       ? aiResult.reply
       : appendProductNamesForDm(aiResult.reply, products, recommendedIds);
 
