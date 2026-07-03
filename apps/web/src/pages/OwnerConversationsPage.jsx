@@ -50,6 +50,7 @@ const ORDER_STATE_BADGE_CLASS = {
   AWAITING_LOCATION: "is-location",
   AWAITING_PHONE: "is-phone",
   CONFIRMED_AWAITING_FINALIZE: "is-confirmed",
+  CONFIRMED: "is-order-confirmed",
 };
 
 function OrderStateBadge({ order }) {

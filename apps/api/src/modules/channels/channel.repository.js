@@ -346,6 +346,7 @@ const DEFAULT_ORDER_STATE = {
   customer_address: null,
   payment_method: null,
   buy_committed: 0,
+  linked_order_id: null,
 };
 
 /**
@@ -365,7 +366,8 @@ function getConversationOrderState(conversationId) {
             customer_name,
             customer_address,
             payment_method,
-            buy_committed
+            buy_committed,
+            linked_order_id
           FROM channel_conversations
           WHERE id = ?
         `
@@ -386,7 +388,19 @@ function getConversationOrderState(conversationId) {
     customer_address: row.customer_address ?? null,
     payment_method: row.payment_method ?? null,
     buy_committed: Number(row.buy_committed) ? 1 : 0,
+    linked_order_id: row.linked_order_id ?? null,
   };
+}
+
+/**
+ * @param {number} conversationId
+ */
+function getConversationLinkedOrderId(conversationId) {
+  const row = db
+    .prepare(`SELECT linked_order_id FROM channel_conversations WHERE id = ?`)
+    .get(conversationId);
+  const id = row?.linked_order_id;
+  return id != null && Number(id) > 0 ? Number(id) : null;
 }
 
 /**
@@ -409,7 +423,8 @@ function saveConversationOrderState(conversationId, patch) {
         customer_name = ?,
         customer_address = ?,
         payment_method = ?,
-        buy_committed = ?
+        buy_committed = ?,
+        linked_order_id = COALESCE(?, linked_order_id)
       WHERE id = ?
     `
   ).run(
@@ -422,6 +437,7 @@ function saveConversationOrderState(conversationId, patch) {
     next.customer_address ?? null,
     next.payment_method ?? null,
     Number(next.buy_committed) ? 1 : 0,
+    next.linked_order_id ?? null,
     conversationId
   );
 
@@ -768,6 +784,7 @@ module.exports = {
   listChannelMessagesForAi,
   getConversationOrderState,
   saveConversationOrderState,
+  getConversationLinkedOrderId,
   insertOutboundChannelMessage,
   getChannelConversationForStore,
   updateChannelConversationTakeover,

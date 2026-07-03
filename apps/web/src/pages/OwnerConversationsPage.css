@@ -373,6 +373,11 @@
   color: #15803d;
 }
 
+.owner-conv__order-badge.is-order-confirmed {
+  background: rgba(16, 185, 129, 0.22);
+  color: #047857;
+}
+
 .owner-conv__session-id {
   font-weight: 800;
   font-size: 0.95rem;

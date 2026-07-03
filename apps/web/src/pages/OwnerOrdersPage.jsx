@@ -97,8 +97,10 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
-      setLoading(true);
+    async function load({ silent = false } = {}) {
+      if (!silent) {
+        setLoading(true);
+      }
       setError(null);
       if (!storeId.trim()) {
         setOrders([]);
@@ -125,15 +127,21 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
           setOrders([]);
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && !silent) {
           setLoading(false);
         }
       }
     }
 
     load();
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      load({ silent: true });
+    }, 12000);
+
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
     };
   }, [storeId]);
 

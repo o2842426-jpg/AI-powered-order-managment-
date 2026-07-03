@@ -36,6 +36,7 @@ const ORDER_STATE_LABELS_AR = {
   [ORDER_STATES.AWAITING_LOCATION]: "بانتظار العنوان",
   [ORDER_STATES.AWAITING_PHONE]: "بانتظار الهاتف",
   [ORDER_STATES.CONFIRMED_AWAITING_FINALIZE]: "جاهز للتثبيت",
+  [ORDER_STATES.CONFIRMED]: "تم التثبيت",
 };
 
 const PAYMENT_LABELS_AR = {

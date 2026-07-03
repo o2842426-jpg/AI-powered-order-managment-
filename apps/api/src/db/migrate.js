@@ -373,6 +373,7 @@ function ensureChannelOrderStateColumns(db) {
     ["customer_address", "TEXT"],
     ["payment_method", "TEXT"],
     ["buy_committed", "INTEGER NOT NULL DEFAULT 0"],
+    ["linked_order_id", "INTEGER"],
   ];
 
   for (const [name, ddl] of additions) {

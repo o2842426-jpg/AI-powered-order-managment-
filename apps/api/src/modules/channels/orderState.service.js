@@ -8,7 +8,15 @@ const BUY_SIGNALS =
   /اشتري|أريد\s*اشتري|اريد\s*اشتري|ابي\s*اشتري|أبي\s*اشتري|ثبت|ثبتلي|ثبّت|احجز|كمل|كمّل|كمل\s*الطلب|رتب|اي\s*ثبت|أي\s*ثبت|ابشر\s*ثبت|اوكي\s*اشتري|تمام\s*اشتري/i;
 
 const IMAGE_REQUEST =
-  /صور|صورة|شوفني|ورّيني|وريني|ارسل.*صور|أرسل.*صور|ابعث.*صور/i;
+  /صور|صورة|صوره|شكلها|شكل|شكله|ورّيني|وريني|شوفني|شوف|دزلي|دزليياها|دزلي\s*ياها|ارسل.*صور|أرسل.*صور|ابعث.*صور|ابي\s*اشوف|أبي\s*اشوف|ممكن\s*اشوف|شلون\s*شكلها/i;
+
+/**
+ * Explicit customer request for product visuals — bypasses throttle and checkout image lock.
+ * @param {string} text
+ */
+function customerExplicitlyRequestsImages(text) {
+  return IMAGE_REQUEST.test(String(text || "").trim());
+}
 
 const CITY_PATTERN = new RegExp(
   `(?:محافظتي|محافظة|عنوان\\s*التوصيل|توصيل\\s*إلى|توصيل\\s*الى|أنا\\s*من|انا\\s*من)\\s*[:\\-]?\\s*(${IRAQI_GOVERNORATES.join("|")})`,
@@ -224,7 +232,7 @@ function syncOrderStateAfterInbound(conversationId, inboundText, history, produc
  * @param {string} orderState
  */
 function shouldAttachProductImages(history, currentText, orderState) {
-  if (IMAGE_REQUEST.test(String(currentText || ""))) {
+  if (customerExplicitlyRequestsImages(currentText)) {
     return true;
   }
 
@@ -293,6 +301,7 @@ module.exports = {
   inferProductFromThread,
   enrichOrderStateFromHistory,
   syncOrderStateAfterInbound,
+  customerExplicitlyRequestsImages,
   shouldAttachProductImages,
   orderStateToCheckoutContext,
   orderStateToConversationPhase,

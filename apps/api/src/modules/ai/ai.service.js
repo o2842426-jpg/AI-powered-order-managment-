@@ -147,18 +147,24 @@ function buildConversationMessages(conversationMessages, messageText, customerIm
   return mapped;
 }
 
-function buildChannelContextBlock(channelContext, salesMode, phase) {
+function buildChannelContextBlock(channelContext, salesMode, phase, customerRequestedImages = false) {
   if (channelContext === "instagram_dm") {
-    const igClose =
-      phase === "checkout"
-        ? `
-- مرحلة إتمام الطلب: لا ترسل صور ولا recommended_product_ids. اجمع بيانات التوصيل فقط.`
-        : salesMode === "aggressive"
-          ? `
+    let igClose;
+    if (customerRequestedImages) {
+      igClose = `
+- الزبون طلب صور/شكل المنتج صراحةً — ضع product_id في recommended_product_ids فوراً.
+- النظام يرسل الصور تلقائياً داخل DM. ممنوع الاعتذار أو قول «ما أقدر أرسل صور».`;
+    } else if (phase === "checkout") {
+      igClose = `
+- مرحلة إتمام الطلب: لا ترسل صور ولا recommended_product_ids إلا إذا طلب الزبون صوراً صراحةً. اجمع بيانات التوصيل فقط.`;
+    } else if (salesMode === "aggressive") {
+      igClose = `
 - في الاكتشاف: عند أول اهتمام بمنتج ضع product_id في recommended_product_ids مرة واحدة — الصور تنرسل تلقائياً.
-- بعد ما يقول «أريد أشتري/ثبت/كمل» لا تعيد الصور ولا المنتجات المقترحة.`
-          : `
+- بعد ما يقول «أريد أشتري/ثبت/كمل» لا تعيد الصور ولا المنتجات المقترحة.`;
+    } else {
+      igClose = `
 - عند طلب صور أو اقتراح منتجات، ضع المعرفات في recommended_product_ids — النظام يرسل الصور في المحادثة.`;
+    }
     return `
 قناة المحادثة: Instagram DM (داخل التطبيق فقط).
 - ممنوع طلب زيارة موقع أو إرسال روابط خارجية. البيع والإغلاق كله هنا بالخاص.
@@ -203,10 +209,10 @@ function buildOwnerPrompt(store) {
 const EMERGENCY_HANDOFF_REPLY =
   "تدلل عيني، هذي الصورة ما واضحة عندي بـ سيستم المخزن الحين. ثواني وراح يحولك النظام للموظف المختص حتى يشوفها بـ عيونه ويخدمك ويرتبلك الطلب. انتظرني لحظة فدوة لقلبك.";
 
-function buildExecutiveSalesPersonaBlock(storeName, salesMode, phase) {
+function buildExecutiveSalesPersonaBlock(storeName, salesMode, phase, customerRequestedImages = false) {
   const brand = String(storeName || "المتجر").trim();
 
-  if (phase === "checkout") {
+  if (phase === "checkout" && !customerRequestedImages) {
     return `
 # هوية المندوب — مرحلة إتمام الطلب
 - أنت موظف استقبال طلبات لـ "${brand}" — هادئ، دقيق، بشري.
@@ -470,6 +476,7 @@ async function generateStoreChatReply({
   conversationPhase = "discovery",
   checkoutContext = null,
   orderStateBlock = "",
+  customerRequestedImages = false,
 }) {
   const allowedProductIds = new Set(
     (products || []).map((p) => Number(p.id)).filter((n) => Number.isInteger(n) && n > 0)
@@ -484,14 +491,24 @@ async function generateStoreChatReply({
   const phase = conversationPhase || "discovery";
   const catalogText = buildCatalogText(products, store?.currency_code);
   const ownerPrompt = buildOwnerPrompt(store);
-  const salesPersona = buildExecutiveSalesPersonaBlock(store?.name, salesMode, phase);
+  const salesPersona = buildExecutiveSalesPersonaBlock(
+    store?.name,
+    salesMode,
+    phase,
+    customerRequestedImages
+  );
   const salesPlaybook = buildSalesPlaybookBlock(salesMode, phase);
   const checkoutBlock =
     phase === "checkout" ? buildCheckoutProtocolBlock(checkoutContext) : "";
   const dynamicStateBlock = String(orderStateBlock || "").trim();
   const memoryBlock = buildMemoryFactsBlock(memoryFacts);
   const followupsBlock = buildFollowupsBlock(followups);
-  const channelBlock = buildChannelContextBlock(channelContext, salesMode, phase);
+  const channelBlock = buildChannelContextBlock(
+    channelContext,
+    salesMode,
+    phase,
+    customerRequestedImages
+  );
   const visionMode = Array.isArray(customerImageUrls) && customerImageUrls.length > 0;
   const historyMessages = buildConversationMessages(
     conversationMessages,
@@ -514,7 +531,10 @@ async function generateStoreChatReply({
     : "";
 
   const recommendAggressive =
-    salesMode === "aggressive" && phase === "discovery"
+    customerRequestedImages
+      ? `
+- الزبون طلب صور صراحةً: ضع product_id في recommended_product_ids حتى في Checkout — النظام يرسل الصور. لا تعتذر.`
+      : salesMode === "aggressive" && phase === "discovery"
       ? `
 - في وضع المبيعات القوي (اكتشاف فقط): أي إشارة شراء أولى (سعر، توفر، صورة) → ضع product_id في recommended_product_ids مرة واحدة لعرض الصور.
 - بعد أن يقول الزبون «أريد أشتري/ثبت/كمل» → recommended_product_ids=[] ولا ترسل صور مجدداً.`

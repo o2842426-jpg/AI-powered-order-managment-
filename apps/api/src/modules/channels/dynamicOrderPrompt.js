@@ -20,6 +20,8 @@ function getCurrentGoalString(state) {
       return "جمع رقم الهاتف واسم المستلم — الموقع محفوظ مسبقاً";
     case ORDER_STATES.CONFIRMED_AWAITING_FINALIZE:
       return "تلخيص الطلب النهائي وتأكيد التثبيت — بدون أسئلة مكررة";
+    case ORDER_STATES.CONFIRMED:
+      return "الطلب مثبّت — أكّد التوصيل فقط إن سُئلت";
     default:
       return "مساعدة الزبون بخطوة واحدة واضحة";
   }

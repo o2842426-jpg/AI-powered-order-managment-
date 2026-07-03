@@ -21,6 +21,8 @@ const {
   listChannelMessagesForAi,
   insertOutboundChannelMessage,
   saveConversationOrderState,
+  getConversationOrderState,
+  getConversationLinkedOrderId,
 } = require("./channel.repository");
 const { resolvePublicMediaUrl } = require("../../lib/publicMediaUrl");
 const {
@@ -31,11 +33,17 @@ const {
   ORDER_STATES,
   syncOrderStateAfterInbound,
   shouldAttachProductImages,
+  customerExplicitlyRequestsImages,
   orderStateToCheckoutContext,
   orderStateToConversationPhase,
   computeOrderState,
 } = require("./orderState.service");
 const { buildDynamicOrderStateBlock } = require("./dynamicOrderPrompt");
+const {
+  canCreateOrderFromState,
+  createOrderFromConversationState,
+  aiIndicatesOrderFinalized,
+} = require("./conversationOrder.service");
 
 /**
  * Append product names only — no store URLs (Instagram DM stays in-chat).
@@ -316,6 +324,7 @@ async function processChannelAiReply({
   const phase = orderStateToConversationPhase(orderState.order_state);
   const checkoutContext = orderStateToCheckoutContext(orderState);
   const orderStateBlock = buildDynamicOrderStateBlock(orderState);
+  const customerRequestedImages = customerExplicitlyRequestsImages(currentText);
   const attachImages = shouldAttachProductImages(
     fullHistory,
     currentText,
@@ -323,7 +332,7 @@ async function processChannelAiReply({
   );
 
   console.info(
-    `[channel-ai] order_state=${orderState.order_state} attachImages=${attachImages} missing=${checkoutContext.missing.join("|") || "none"}`
+    `[channel-ai] order_state=${orderState.order_state} attachImages=${attachImages} imageOverride=${customerRequestedImages} missing=${checkoutContext.missing.join("|") || "none"}`
   );
 
   const aiResult = await generateStoreChatReply({
@@ -338,14 +347,17 @@ async function processChannelAiReply({
     conversationPhase: phase,
     checkoutContext,
     orderStateBlock,
+    customerRequestedImages,
   });
 
   let recommendedIds = Array.isArray(aiResult.recommended_product_ids)
     ? aiResult.recommended_product_ids
     : [];
 
-  if (phase === "checkout" || !attachImages) {
+  if (!attachImages) {
     recommendedIds = [];
+  } else if (!recommendedIds.length && orderState.order_product_id) {
+    recommendedIds = [Number(orderState.order_product_id)];
   }
 
   if (
@@ -377,6 +389,25 @@ async function processChannelAiReply({
   if (!replyText.trim()) {
     console.warn(`[channel-ai] empty reply blocked conversation=${conversationId}`);
     return;
+  }
+
+  const linkedOrderId = getConversationLinkedOrderId(conversationId);
+  const freshOrderState = getConversationOrderState(conversationId);
+  const shouldPersistOrder =
+    canCreateOrderFromState(freshOrderState, linkedOrderId) ||
+    aiIndicatesOrderFinalized(aiResult, freshOrderState);
+
+  if (shouldPersistOrder) {
+    const orderResult = createOrderFromConversationState({
+      conversationId,
+      storeId,
+      orderState: freshOrderState,
+    });
+    if (orderResult.created) {
+      console.info(
+        `[channel-ai] order persisted conversation=${conversationId} order_id=${orderResult.order_id}`
+      );
+    }
   }
 
   const payload = { recommended_product_ids: recommendedIds };
