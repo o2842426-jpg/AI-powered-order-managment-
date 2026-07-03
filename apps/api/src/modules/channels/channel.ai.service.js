@@ -41,6 +41,7 @@ const {
 } = require("./orderState.service");
 const { buildDynamicOrderStateBlock } = require("./dynamicOrderPrompt");
 const { detectConversationPhase } = require("./conversationPhase");
+const { listSalesExamplesForStore } = require("../salesTraining/salesExamples.repository");
 const {
   canCreateOrderFromState,
   createOrderFromConversationState,
@@ -343,6 +344,8 @@ async function processChannelAiReply({
     `[channel-ai] phase=${phase} order_state=${orderState.order_state} attachImages=${attachImages} imageOverride=${customerRequestedImages} missing=${checkoutContext.missing.join("|") || "none"}`
   );
 
+  const salesExamples = listSalesExamplesForStore(store.id);
+
   const aiResult = await generateStoreChatReply({
     store,
     products,
@@ -356,6 +359,7 @@ async function processChannelAiReply({
     checkoutContext,
     orderStateBlock,
     customerRequestedImages,
+    salesExamples,
   });
 
   let recommendedIds = Array.isArray(aiResult.recommended_product_ids)

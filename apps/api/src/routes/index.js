@@ -8,6 +8,7 @@ const { billingRouter } = require("../modules/billing/billing.routes");
 const { adminRouter } = require("../modules/admin/admin.routes");
 const apiRouter = express.Router();
 const { ordersRouter } = require("../modules/orders/orders.routes");
+const { dashboardRouter } = require("../modules/dashboard/dashboard.routes");
 apiRouter.get("/health", (_req, res) => {
   res.status(200).json({ ok: true, service: "dm-commerce-api" });
 });
@@ -20,5 +21,6 @@ apiRouter.use("/stores", storesRouter);
 apiRouter.use("/uploads", uploadsRouter);
 apiRouter.use("/public", publicRouter);
 apiRouter.use("/orders", ordersRouter);
+apiRouter.use("/dashboard", dashboardRouter);
 module.exports = { apiRouter };
 

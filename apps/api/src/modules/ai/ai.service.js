@@ -1,4 +1,6 @@
 const OpenAI = require("openai");
+const { listSalesExamplesForStore } = require("../salesTraining/salesExamples.repository");
+const { buildSalesTrainingBlock } = require("../salesTraining/salesTrainingPrompt");
 
 const FALLBACK_REPLY = "تم استلام رسالتك، وسيتم الرد قريبًا.";
 const MAX_HISTORY_MESSAGES = 10;
@@ -547,6 +549,7 @@ async function generateStoreChatReply({
   checkoutContext = null,
   orderStateBlock = "",
   customerRequestedImages = false,
+  salesExamples = null,
 }) {
   const allowedProductIds = new Set(
     (products || []).map((p) => Number(p.id)).filter((n) => Number.isInteger(n) && n > 0)
@@ -572,6 +575,12 @@ async function generateStoreChatReply({
   const checkoutBlock =
     phase === "checkout" ? buildCheckoutProtocolBlock(checkoutContext) : "";
   const dynamicStateBlock = String(orderStateBlock || "").trim();
+  const resolvedSalesExamples = Array.isArray(salesExamples)
+    ? salesExamples
+    : Number(store?.id) > 0
+      ? listSalesExamplesForStore(Number(store.id))
+      : [];
+  const trainingBlock = buildSalesTrainingBlock(resolvedSalesExamples, phase);
   const memoryBlock = buildMemoryFactsBlock(memoryFacts);
   const followupsBlock = buildFollowupsBlock(followups);
   const channelBlock = buildChannelContextBlock(
@@ -662,7 +671,7 @@ ${jsonInstructions}
 
 ${salesPersona}
 
-${dynamicStateBlock ? `${dynamicStateBlock}\n\n` : ""}${objectionBlock ? `${objectionBlock}\n\n` : ""}${checkoutBlock ? `${checkoutBlock}\n\n` : ""}${salesPlaybook}
+${dynamicStateBlock ? `${dynamicStateBlock}\n\n` : ""}${objectionBlock ? `${objectionBlock}\n\n` : ""}${checkoutBlock ? `${checkoutBlock}\n\n` : ""}${salesPlaybook}${trainingBlock ? `\n\n${trainingBlock}` : ""}
 
 تعليمات صاحب المتجر (ما لم تخالف الكتالوج أو قواعد الإغلاق):
 ${ownerPrompt}${channelBlock ? `\n\n${channelBlock}` : ""}${memoryBlock}${followupsBlock}`,

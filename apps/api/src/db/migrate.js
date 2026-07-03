@@ -24,6 +24,7 @@ function migrate(db) {
   ensureChannelTables(db);
   ensureChannelOrderStateColumns(db);
   ensureProductImagesTable(db);
+  ensureSalesExamplesTable(db);
 }
 
 function ensureStoreSettingsColumns(db) {
@@ -381,6 +382,24 @@ function ensureChannelOrderStateColumns(db) {
       db.exec(`ALTER TABLE channel_conversations ADD COLUMN ${name} ${ddl}`);
     }
   }
+}
+
+function ensureSalesExamplesTable(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sales_examples (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      store_id INTEGER NOT NULL,
+      category TEXT NOT NULL,
+      user_input TEXT NOT NULL,
+      ideal_response TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_sales_examples_store_category
+      ON sales_examples(store_id, category);
+    CREATE INDEX IF NOT EXISTS idx_sales_examples_store_created
+      ON sales_examples(store_id, id);
+  `);
 }
 
 function ensureProductImagesTable(db) {
