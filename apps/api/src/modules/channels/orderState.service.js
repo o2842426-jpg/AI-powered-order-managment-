@@ -19,7 +19,17 @@ function customerExplicitlyRequestsImages(text) {
 }
 
 const CITY_PATTERN = new RegExp(
-  `(?:محافظتي|محافظة|عنوان\\s*التوصيل|توصيل\\s*إلى|توصيل\\s*الى|أنا\\s*من|انا\\s*من)\\s*[:\\-]?\\s*(${IRAQI_GOVERNORATES.join("|")})`,
+  `(?:محافظتي|محافظة|عنوان\\s*التوصيل|توصيل\\s*(?:إلى|الى|ل|لي)?|أنا\\s*من|انا\\s*من)\\s*[:\\-]?\\s*(${IRAQI_GOVERNORATES.join("|")})`,
+  "i"
+);
+
+const DELIVERY_TO_CITY = new RegExp(
+  `توصيل\\s*(?:ل|إلى|الى|لي)?\\s*(${IRAQI_GOVERNORATES.join("|")})`,
+  "i"
+);
+
+const INLINE_CITY = new RegExp(
+  `(?:^|[\\s،,])(?:ل)?(${IRAQI_GOVERNORATES.join("|")})(?:[\\s،,.]|$)`,
   "i"
 );
 
@@ -27,6 +37,50 @@ const STANDALONE_CITY = new RegExp(
   `^\\s*(${IRAQI_GOVERNORATES.join("|")})\\s*$`,
   "i"
 );
+
+/**
+ * @param {string} text
+ * @param {object[]} [products]
+ */
+function inferProductFromText(text, products = []) {
+  const haystack = String(text || "").toLowerCase();
+  if (!haystack.trim()) return {};
+
+  let best = null;
+  let bestScore = 0;
+
+  for (const product of products || []) {
+    const name = String(product.name || "").trim();
+    if (!name) continue;
+
+    const nameLower = name.toLowerCase();
+    if (haystack.includes(nameLower)) {
+      return {
+        order_product_id: Number(product.id),
+        order_product_name: name,
+      };
+    }
+
+    const tokens = nameLower.split(/[\s\-]+/).filter((t) => t.length >= 4);
+    let score = 0;
+    for (const token of tokens) {
+      if (haystack.includes(token)) score += token.length;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = product;
+    }
+  }
+
+  if (best && bestScore >= 6) {
+    return {
+      order_product_id: Number(best.id),
+      order_product_name: String(best.name || "").trim(),
+    };
+  }
+
+  return {};
+}
 
 /**
  * @param {string} text
@@ -40,7 +94,11 @@ function extractFieldsFromMessage(text) {
     patch.customer_phone = phoneMatch[1].replace(/^\+964/, "0");
   }
 
-  const cityMatch = t.match(CITY_PATTERN) || t.match(STANDALONE_CITY);
+  const cityMatch =
+    t.match(CITY_PATTERN) ||
+    t.match(DELIVERY_TO_CITY) ||
+    t.match(INLINE_CITY) ||
+    t.match(STANDALONE_CITY);
   if (cityMatch) {
     patch.customer_city = normalizeCity(cityMatch[1]);
   }
@@ -49,9 +107,11 @@ function extractFieldsFromMessage(text) {
     patch.payment_method = "cash_on_delivery";
   }
 
-  const nameMatch = t.match(/(?:اسمي|أنا)\s+([^\n،,.]{4,60})/i);
+  const nameMatch =
+    t.match(/(?:اسمي|أنا)\s+(.+?)(?:\s*[،,]\s*رقمي|\s+رقمي|\s*[،,]|$)/i) ||
+    t.match(/(?:اسمي|أنا)\s+([^\n]{4,80})/i);
   if (nameMatch) {
-    patch.customer_name = nameMatch[1].trim();
+    patch.customer_name = nameMatch[1].trim().replace(/\s+رقمي.*$/i, "").trim();
   }
 
   const addressMatch = t.match(
@@ -62,6 +122,14 @@ function extractFieldsFromMessage(text) {
   }
 
   if (BUY_SIGNALS.test(t)) {
+    patch.buy_confirmed = true;
+  }
+
+  if (
+    patch.customer_phone &&
+    patch.customer_name &&
+    (patch.customer_city || patch.customer_address)
+  ) {
     patch.buy_confirmed = true;
   }
 
@@ -179,6 +247,10 @@ function enrichOrderStateFromHistory(row, history, products = []) {
     Object.assign(merged, inferProductFromThread(history, products));
   }
 
+  if (!merged.order_product_name) {
+    Object.assign(merged, inferProductFromText(lines.join("\n"), products));
+  }
+
   return merged;
 }
 
@@ -217,6 +289,49 @@ function syncOrderStateAfterInbound(conversationId, inboundText, history, produc
   };
 
   delete merged.buy_confirmed;
+
+  merged.order_state = computeOrderState(merged);
+  saveConversationOrderState(conversationId, merged);
+  return merged;
+}
+
+/**
+ * Merge inbound + AI reply into persistable order state (saved to DB).
+ *
+ * @param {number} conversationId
+ * @param {object} orderState
+ * @param {{ inboundText?: string, history?: object[], products?: object[], aiReply?: string }} ctx
+ */
+function prepareOrderStateForPersist(conversationId, orderState, ctx = {}) {
+  const { inboundText = "", history = [], products = [], aiReply = "" } = ctx;
+
+  let merged = enrichOrderStateFromHistory(orderState, history, products);
+  Object.assign(merged, extractFieldsFromMessage(inboundText));
+
+  const combinedText = [
+    ...history.map((m) => String(m.message_text || "")),
+    inboundText,
+    aiReply,
+  ].join("\n");
+
+  if (!merged.order_product_id) {
+    Object.assign(merged, inferProductFromText(combinedText, products));
+  }
+  if (!merged.order_product_id) {
+    Object.assign(merged, inferProductFromThread(history, products));
+  }
+
+  if (
+    merged.customer_phone &&
+    (merged.customer_city || merged.customer_address) &&
+    merged.order_product_id
+  ) {
+    merged.buy_committed = 1;
+  }
+
+  if (/ثبّ?ت|تثبّ?ت|الطلب\s*تثبت|تثبت\s*وراح/i.test(String(aiReply || ""))) {
+    merged.buy_committed = 1;
+  }
 
   merged.order_state = computeOrderState(merged);
   saveConversationOrderState(conversationId, merged);
@@ -300,6 +415,8 @@ module.exports = {
   computeOrderState,
   inferProductFromThread,
   enrichOrderStateFromHistory,
+  prepareOrderStateForPersist,
+  inferProductFromText,
   syncOrderStateAfterInbound,
   customerExplicitlyRequestsImages,
   shouldAttachProductImages,

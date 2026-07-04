@@ -37,6 +37,7 @@ const {
   orderStateToCheckoutContext,
   orderStateToConversationPhase,
   computeOrderState,
+  prepareOrderStateForPersist,
 } = require("./orderState.service");
 const { buildDynamicOrderStateBlock } = require("./dynamicOrderPrompt");
 const { detectConversationPhase } = require("./conversationPhase");
@@ -415,22 +416,39 @@ async function processChannelAiReply({
   }
 
   const linkedOrderId = getConversationLinkedOrderId(conversationId);
-  const freshOrderState = getConversationOrderState(conversationId);
+  const persistState = prepareOrderStateForPersist(
+    conversationId,
+    getConversationOrderState(conversationId),
+    {
+      inboundText: currentText,
+      history: fullHistory,
+      products,
+      aiReply: aiResult.reply,
+    }
+  );
   const shouldPersistOrder =
-    canCreateOrderFromState(freshOrderState, linkedOrderId) ||
-    aiIndicatesOrderFinalized(aiResult, freshOrderState);
+    canCreateOrderFromState(persistState, linkedOrderId) ||
+    aiIndicatesOrderFinalized(aiResult, persistState);
 
   if (shouldPersistOrder) {
     const orderResult = createOrderFromConversationState({
       conversationId,
       storeId,
-      orderState: freshOrderState,
+      orderState: persistState,
     });
     if (orderResult.created) {
       console.info(
         `[channel-ai] order persisted conversation=${conversationId} order_id=${orderResult.order_id} (state hard-reset in DB transaction)`
       );
+    } else {
+      console.warn(
+        `[channel-ai] order persist skipped conversation=${conversationId} reason=${orderResult.reason} debug=${JSON.stringify(orderResult.debug || {})}`
+      );
     }
+  } else {
+    console.info(
+      `[channel-ai] order not ready conversation=${conversationId} state=${persistState.order_state} product=${persistState.order_product_id || "none"} phone=${persistState.customer_phone ? "yes" : "no"} city=${persistState.customer_city || "none"}`
+    );
   }
 
   const payload = { recommended_product_ids: recommendedIds };

@@ -3,6 +3,18 @@ const { ORDER_STATES } = require("./orderState.constants");
 const { hardResetConversationOrderState } = require("./channel.repository");
 
 /**
+ * Minimum fields required to insert an order row.
+ * @param {object} orderState
+ */
+function hasMinimumOrderFields(orderState) {
+  return Boolean(
+    orderState?.order_product_id &&
+    orderState?.customer_phone &&
+    (orderState?.customer_city || orderState?.customer_address)
+  );
+}
+
+/**
  * @param {object} orderState
  * @param {number | null | undefined} linkedOrderId
  */
@@ -11,19 +23,19 @@ function canCreateOrderFromState(orderState, linkedOrderId) {
     return false;
   }
 
-  const state = orderState?.order_state;
-  if (
-    state !== ORDER_STATES.CONFIRMED_AWAITING_FINALIZE &&
-    state !== ORDER_STATES.CONFIRMED
-  ) {
+  if (!hasMinimumOrderFields(orderState)) {
     return false;
   }
 
-  return Boolean(
-    orderState.order_product_id &&
-    orderState.customer_phone &&
-    (orderState.customer_city || orderState.customer_address)
-  );
+  const state = orderState?.order_state;
+  if (
+    state === ORDER_STATES.CONFIRMED_AWAITING_FINALIZE ||
+    state === ORDER_STATES.CONFIRMED
+  ) {
+    return true;
+  }
+
+  return Boolean(orderState.buy_committed);
 }
 
 /**
@@ -47,13 +59,13 @@ function buildDeliveryAddress(orderState) {
 function aiIndicatesOrderFinalized(aiResult, orderState) {
   const reply = String(aiResult?.reply || "");
   if (
-    !/ثبّ?ت|تثبّ?ت|سجّ?لنا|سجلنا|سجّ?ل|سجل|راح\s*يوصل|وصلك|٢\s*[-–]\s*٣|2\s*[-–]\s*3\s*أيام/i.test(
+    !/ثبّ?ت|تثبّ?ت|تثبت|الطلب\s*تثبت|سجّ?لنا|سجلنا|سجّ?ل|سجل|راح\s*يوصل|وصلك|يوصل\s*فريق|فريق\s*التوصيل|٢\s*[-–]\s*٣|2\s*[-–]\s*3\s*أيام/i.test(
       reply
     )
   ) {
     return false;
   }
-  return canCreateOrderFromState(orderState, null);
+  return hasMinimumOrderFields(orderState);
 }
 
 /**
@@ -94,6 +106,13 @@ function createOrderFromConversationState({
       created: false,
       reason: linkedOrderId ? "already_linked" : "incomplete_state",
       order_id: linkedOrderId,
+      debug: {
+        order_state: orderState.order_state,
+        product_id: orderState.order_product_id,
+        phone: Boolean(orderState.customer_phone),
+        city: Boolean(orderState.customer_city),
+        buy_committed: Boolean(orderState.buy_committed),
+      },
     };
   }
 
@@ -209,6 +228,7 @@ function createOrderFromConversationState({
 
 module.exports = {
   canCreateOrderFromState,
+  hasMinimumOrderFields,
   createOrderFromConversationState,
   aiIndicatesOrderFinalized,
   buildDeliveryAddress,
