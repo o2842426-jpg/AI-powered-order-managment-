@@ -253,39 +253,35 @@ function createOrderFromConversationState({
   const customerNote = `طلب إنستغرام DM · ${paymentNote}`;
 
   const created = db.transaction(() => {
-    let customerId =
-      meta.customer_id != null && Number(meta.customer_id) > 0
-        ? Number(meta.customer_id)
-        : null;
+    let customerId = null;
+    const existing = db
+      .prepare(`SELECT id FROM customers WHERE store_id = ? AND phone = ?`)
+      .get(storeId, customerPhone);
 
-    if (!customerId) {
-      const existing = db
-        .prepare(`SELECT id FROM customers WHERE store_id = ? AND phone = ?`)
-        .get(storeId, customerPhone);
-
-      if (existing) {
-        customerId = Number(existing.id);
-        db.prepare(
-          `UPDATE customers SET name = ?, address_text = ? WHERE id = ?`
-        ).run(customerName, deliveryAddress, customerId);
-      } else {
-        const ins = db
-          .prepare(
-            `
+    if (existing) {
+      customerId = Number(existing.id);
+      db.prepare(
+        `UPDATE customers SET name = ?, address_text = ? WHERE id = ?`
+      ).run(customerName, deliveryAddress, customerId);
+    } else {
+      const ins = db
+        .prepare(
+          `
               INSERT INTO customers (store_id, name, phone, address_text, notes)
               VALUES (?, ?, ?, ?, ?)
             `
-          )
-          .run(
-            storeId,
-            customerName,
-            customerPhone,
-            deliveryAddress,
-            "Instagram DM"
-          );
-        customerId = Number(ins.lastInsertRowid);
-      }
+        )
+        .run(
+          storeId,
+          customerName,
+          customerPhone,
+          deliveryAddress,
+          "Instagram DM"
+        );
+      customerId = Number(ins.lastInsertRowid);
+    }
 
+    if (Number(meta.customer_id) !== customerId) {
       db.prepare(`UPDATE channel_conversations SET customer_id = ? WHERE id = ?`).run(
         customerId,
         conversationId

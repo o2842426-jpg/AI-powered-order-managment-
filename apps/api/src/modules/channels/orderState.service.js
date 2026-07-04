@@ -5,7 +5,74 @@ const {
 const { ORDER_STATES, IRAQI_GOVERNORATES } = require("./orderState.constants");
 
 const BUY_SIGNALS =
-  /اشتري|أريد\s*اشتري|اريد\s*اشتري|ابي\s*اشتري|أبي\s*اشتري|ثبت|ثبتلي|ثبّت|احجز|كمل|كمّل|كمل\s*الطلب|رتب|اي\s*ثبت|أي\s*ثبت|ابشر\s*ثبت|اوكي\s*اشتري|تمام\s*اشتري/i;
+  /اشتري|أريد\s*اشتري|اريد\s*اشتري|أريد\s*أطلب|اريد\s*أطلب|أريد\s*اطلب|اريد\s*اطلب|ابي\s*اشتري|أبي\s*اشتري|ابي\s*اطلب|أبي\s*اطلب|(?:^|[\s،,])(?:أطلب|اطلب)(?:[\s،,]|$)|ثبت|ثبتلي|ثبّت|احجز|كمل|كمّل|كمل\s*الطلب|رتب|اي\s*ثبت|أي\s*ثبت|ابشر\s*ثبت|اوكي\s*اشتري|تمام\s*اشتري|طلب\s*جديد/i;
+
+const NEW_CHECKOUT_INTENT =
+  /(?:أريد|اريد|ابي|أبي)\s*(?:أطلب|اطلب|اشتري|أطلب)|(?:^|[\s،,])(?:أطلب|اطلب)\s|طلب\s*جديد/i;
+
+const PHONE_IN_TEXT =
+  /(?:^|[\s،,؛:]|رقم(?:ي|الهاتف)?\s*)(\+?964?)?(0?7\d{9})(?:[\s،,؛.]|$)/;
+
+/**
+ * @param {string} text
+ */
+function extractPhoneFromText(text) {
+  const t = String(text || "");
+  const loose = t.match(PHONE_IN_TEXT);
+  if (loose) {
+    const digits = String(loose[2] || "").replace(/\D/g, "");
+    if (digits.length === 10 && digits.startsWith("7")) {
+      return `0${digits}`;
+    }
+    if (digits.length === 11 && digits.startsWith("07")) {
+      return digits;
+    }
+  }
+  const strict =
+    t.match(/\b(07\d{9})\b/) || t.match(/\b(\+9647\d{9})\b/);
+  if (strict) {
+    return strict[1].replace(/^\+964/, "0");
+  }
+  return null;
+}
+
+/**
+ * @param {string} text
+ */
+function isNewCheckoutIntent(text) {
+  return NEW_CHECKOUT_INTENT.test(String(text || "").trim());
+}
+
+/**
+ * Apply contact fields from texts; later texts override earlier ones.
+ *
+ * @param {object} merged
+ * @param {string[]} texts
+ */
+function applyContactFieldsLatestWins(merged, texts) {
+  for (const text of texts) {
+    const extracted = extractFieldsFromMessage(text);
+    if (extracted.customer_phone) {
+      merged.customer_phone = extracted.customer_phone;
+    }
+    if (extracted.customer_name) {
+      merged.customer_name = extracted.customer_name;
+    }
+    if (extracted.customer_city) {
+      merged.customer_city = extracted.customer_city;
+    }
+    if (extracted.customer_address) {
+      merged.customer_address = extracted.customer_address;
+    }
+    if (extracted.payment_method) {
+      merged.payment_method = extracted.payment_method;
+    }
+    if (extracted.buy_confirmed) {
+      merged.buy_committed = 1;
+    }
+  }
+  return merged;
+}
 
 const IMAGE_REQUEST =
   /صور|صورة|صوره|شكلها|شكل|شكله|ورّيني|وريني|شوفني|شوف|دزلي|دزليياها|دزلي\s*ياها|ارسل.*صور|أرسل.*صور|ابعث.*صور|ابي\s*اشوف|أبي\s*اشوف|ممكن\s*اشوف|شلون\s*شكلها/i;
@@ -89,9 +156,9 @@ function extractFieldsFromMessage(text) {
   const t = String(text || "").trim();
   const patch = {};
 
-  const phoneMatch = t.match(/\b(07\d{9})\b/) || t.match(/\b(\+9647\d{9})\b/);
+  const phoneMatch = extractPhoneFromText(t);
   if (phoneMatch) {
-    patch.customer_phone = phoneMatch[1].replace(/^\+964/, "0");
+    patch.customer_phone = phoneMatch;
   }
 
   const cityMatch =
@@ -215,9 +282,12 @@ function inferProductFromThread(history, products) {
  */
 function enrichOrderStateFromHistory(row, history, products = []) {
   const merged = { ...row };
-  const lines = (history || []).map((m) => String(m.message_text || ""));
+  const lines = (history || [])
+    .map((m) => String(m.message_text || ""))
+    .filter(Boolean);
 
-  for (const line of lines) {
+  // Newest customer/AI lines win — avoids stale phone from an earlier checkout.
+  for (const line of [...lines].reverse()) {
     const extracted = extractFieldsFromMessage(line);
     if (!merged.customer_phone && extracted.customer_phone) {
       merged.customer_phone = extracted.customer_phone;
@@ -262,7 +332,21 @@ function enrichOrderStateFromHistory(row, history, products = []) {
  */
 function syncOrderStateAfterInbound(conversationId, inboundText, history, products) {
   const current = getConversationOrderState(conversationId);
-  let merged = enrichOrderStateFromHistory(current, history, products);
+  let base = { ...current };
+
+  if (isNewCheckoutIntent(inboundText)) {
+    base = {
+      ...base,
+      order_product_id: null,
+      order_product_name: null,
+      customer_phone: null,
+      customer_name: null,
+      customer_address: null,
+      buy_committed: 0,
+    };
+  }
+
+  let merged = enrichOrderStateFromHistory(base, history, products);
   const extracted = extractFieldsFromMessage(inboundText);
   const patch = { ...extracted };
 
@@ -305,8 +389,21 @@ function syncOrderStateAfterInbound(conversationId, inboundText, history, produc
 function prepareOrderStateForPersist(conversationId, orderState, ctx = {}) {
   const { inboundText = "", history = [], products = [], aiReply = "" } = ctx;
 
-  let merged = enrichOrderStateFromHistory(orderState, history, products);
-  Object.assign(merged, extractFieldsFromMessage(inboundText));
+  let base = { ...orderState };
+  if (isNewCheckoutIntent(inboundText)) {
+    base = {
+      ...base,
+      order_product_id: null,
+      order_product_name: null,
+      customer_phone: null,
+      customer_name: null,
+      customer_address: null,
+      buy_committed: 0,
+    };
+  }
+
+  let merged = enrichOrderStateFromHistory(base, history, products);
+  applyContactFieldsLatestWins(merged, [inboundText, aiReply]);
 
   const combinedText = [
     ...history.map((m) => String(m.message_text || "")),
@@ -314,11 +411,12 @@ function prepareOrderStateForPersist(conversationId, orderState, ctx = {}) {
     aiReply,
   ].join("\n");
 
-  if (!merged.order_product_id) {
-    Object.assign(merged, inferProductFromText(combinedText, products));
-  }
+  Object.assign(merged, inferProductFromText(combinedText, products));
   if (!merged.order_product_id) {
     Object.assign(merged, inferProductFromThread(history, products));
+  }
+  if (!merged.order_product_id) {
+    Object.assign(merged, inferProductFromText(aiReply, products));
   }
 
   if (
@@ -412,6 +510,9 @@ function orderStateToConversationPhase(orderState) {
 module.exports = {
   ORDER_STATES,
   extractFieldsFromMessage,
+  extractPhoneFromText,
+  isNewCheckoutIntent,
+  applyContactFieldsLatestWins,
   computeOrderState,
   inferProductFromThread,
   enrichOrderStateFromHistory,

@@ -456,7 +456,7 @@ async function processChannelAiReply({
     }
   } else {
     console.info(
-      `[channel-ai] order not ready conversation=${conversationId} state=${persistState.order_state} product=${persistState.order_product_id || "none"} phone=${persistState.customer_phone ? "yes" : "no"} city=${persistState.customer_city || "none"} linked_order=${linkedOrderId || "none"}`
+      `[channel-ai] order not ready conversation=${conversationId} state=${persistState.order_state} product=${persistState.order_product_id || "none"} phone=${persistState.customer_phone || "none"} city=${persistState.customer_city || "none"} linked_order=${linkedOrderId || "none"}`
     );
   }
 
