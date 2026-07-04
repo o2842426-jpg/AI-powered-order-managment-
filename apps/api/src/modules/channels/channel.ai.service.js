@@ -22,7 +22,6 @@ const {
   insertOutboundChannelMessage,
   saveConversationOrderState,
   getConversationOrderState,
-  getConversationLinkedOrderId,
 } = require("./channel.repository");
 const { resolvePublicMediaUrl } = require("../../lib/publicMediaUrl");
 const {
@@ -46,6 +45,7 @@ const {
   canCreateOrderFromState,
   createOrderFromConversationState,
   aiIndicatesOrderFinalized,
+  reconcileConversationLinkedOrder,
 } = require("./conversationOrder.service");
 
 /**
@@ -415,7 +415,6 @@ async function processChannelAiReply({
     return;
   }
 
-  const linkedOrderId = getConversationLinkedOrderId(conversationId);
   const persistState = prepareOrderStateForPersist(
     conversationId,
     getConversationOrderState(conversationId),
@@ -426,9 +425,15 @@ async function processChannelAiReply({
       aiReply: aiResult.reply,
     }
   );
+  const linkMeta = reconcileConversationLinkedOrder(
+    conversationId,
+    storeId,
+    persistState
+  );
+  const linkedOrderId = linkMeta.linkedOrderId;
   const shouldPersistOrder =
     canCreateOrderFromState(persistState, linkedOrderId) ||
-    aiIndicatesOrderFinalized(aiResult, persistState);
+    (aiIndicatesOrderFinalized(aiResult, persistState) && !linkedOrderId);
 
   if (shouldPersistOrder) {
     const orderResult = createOrderFromConversationState({
@@ -440,6 +445,10 @@ async function processChannelAiReply({
       console.info(
         `[channel-ai] order persisted conversation=${conversationId} order_id=${orderResult.order_id} (state hard-reset in DB transaction)`
       );
+    } else if (orderResult.reason === "already_created") {
+      console.info(
+        `[channel-ai] order already in dashboard conversation=${conversationId} order_id=${orderResult.order_id} hidden=${orderResult.is_hidden ? "yes" : "no"}`
+      );
     } else {
       console.warn(
         `[channel-ai] order persist skipped conversation=${conversationId} reason=${orderResult.reason} debug=${JSON.stringify(orderResult.debug || {})}`
@@ -447,7 +456,7 @@ async function processChannelAiReply({
     }
   } else {
     console.info(
-      `[channel-ai] order not ready conversation=${conversationId} state=${persistState.order_state} product=${persistState.order_product_id || "none"} phone=${persistState.customer_phone ? "yes" : "no"} city=${persistState.customer_city || "none"}`
+      `[channel-ai] order not ready conversation=${conversationId} state=${persistState.order_state} product=${persistState.order_product_id || "none"} phone=${persistState.customer_phone ? "yes" : "no"} city=${persistState.customer_city || "none"} linked_order=${linkedOrderId || "none"}`
     );
   }
 

@@ -1,6 +1,67 @@
 const { db } = require("../../db/client");
 const { ORDER_STATES } = require("./orderState.constants");
-const { hardResetConversationOrderState } = require("./channel.repository");
+const {
+  hardResetConversationOrderState,
+  getConversationLinkedOrderId,
+} = require("./channel.repository");
+
+/**
+ * Clear stale linked_order_id left by pre–hard-reset deploys or wrong-store links.
+ * Allows a new checkout when the customer picks a different product.
+ *
+ * @param {number} conversationId
+ * @param {number} storeId
+ * @param {object} [orderState]
+ */
+function reconcileConversationLinkedOrder(conversationId, storeId, orderState = {}) {
+  const linkedId = getConversationLinkedOrderId(conversationId);
+  if (!linkedId) {
+    return { linkedOrderId: null, existingOrderId: null, isHidden: false };
+  }
+
+  const clearLink = () => {
+    db.prepare(
+      `UPDATE channel_conversations SET linked_order_id = NULL WHERE id = ?`
+    ).run(conversationId);
+  };
+
+  const order = db
+    .prepare(`SELECT id, store_id, is_hidden FROM orders WHERE id = ?`)
+    .get(linkedId);
+
+  if (!order || Number(order.store_id) !== Number(storeId)) {
+    clearLink();
+    console.info(
+      `[channel-order] cleared stale linked_order_id=${linkedId} conversation=${conversationId} (missing or wrong store)`
+    );
+    return { linkedOrderId: null, existingOrderId: null, isHidden: false };
+  }
+
+  const linkedItem = db
+    .prepare(`SELECT product_id FROM order_items WHERE order_id = ? LIMIT 1`)
+    .get(linkedId);
+  const linkedProductId = linkedItem?.product_id ? Number(linkedItem.product_id) : 0;
+  const currentProductId = Number(orderState.order_product_id) || 0;
+
+  if (
+    currentProductId &&
+    linkedProductId &&
+    currentProductId !== linkedProductId
+  ) {
+    clearLink();
+    console.info(
+      `[channel-order] cleared linked_order_id=${linkedId} conversation=${conversationId} (new product ${currentProductId} ≠ linked ${linkedProductId})`
+    );
+    return { linkedOrderId: null, existingOrderId: null, isHidden: false };
+  }
+
+  const isHidden = Boolean(Number(order.is_hidden));
+  return {
+    linkedOrderId: linkedId,
+    existingOrderId: linkedId,
+    isHidden,
+  };
+}
 
 /**
  * Minimum fields required to insert an order row.
@@ -96,16 +157,33 @@ function createOrderFromConversationState({
     return { created: false, reason: "conversation_not_found" };
   }
 
-  const linkedOrderId =
-    meta.linked_order_id != null && Number(meta.linked_order_id) > 0
-      ? Number(meta.linked_order_id)
-      : null;
+  const linkMeta = reconcileConversationLinkedOrder(
+    conversationId,
+    storeId,
+    orderState
+  );
+  const linkedOrderId = linkMeta.linkedOrderId;
 
   if (!canCreateOrderFromState(orderState, linkedOrderId)) {
+    if (linkedOrderId && linkMeta.existingOrderId) {
+      return {
+        created: false,
+        reason: "already_created",
+        order_id: linkedOrderId,
+        is_hidden: linkMeta.isHidden,
+        debug: {
+          order_state: orderState.order_state,
+          product_id: orderState.order_product_id,
+          phone: Boolean(orderState.customer_phone),
+          city: Boolean(orderState.customer_city),
+          buy_committed: Boolean(orderState.buy_committed),
+        },
+      };
+    }
     return {
       created: false,
-      reason: linkedOrderId ? "already_linked" : "incomplete_state",
-      order_id: linkedOrderId,
+      reason: "incomplete_state",
+      order_id: null,
       debug: {
         order_state: orderState.order_state,
         product_id: orderState.order_product_id,
@@ -229,6 +307,7 @@ function createOrderFromConversationState({
 module.exports = {
   canCreateOrderFromState,
   hasMinimumOrderFields,
+  reconcileConversationLinkedOrder,
   createOrderFromConversationState,
   aiIndicatesOrderFinalized,
   buildDeliveryAddress,
