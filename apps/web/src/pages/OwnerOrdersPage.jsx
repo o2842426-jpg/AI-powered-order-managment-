@@ -623,11 +623,19 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
       )}
 
       {!loading && !error && orders.length === 0 && (
-        <p className="owner-orders__empty">
-          {showHiddenOrders
-            ? 'لا توجد طلبات مخفية.'
-            : 'لا توجد طلبات لهذا المتجر.'}
-        </p>
+        <>
+          <p className="owner-orders__empty">
+            {showHiddenOrders
+              ? 'لا توجد طلبات مخفية.'
+              : 'لا توجد طلبات لهذا المتجر.'}
+          </p>
+          {!showHiddenOrders && statusCounts.hidden > 0 ? (
+            <p className="owner-orders__empty owner-orders__empty--hint">
+              لديك {statusCounts.hidden} طلبًا مخفيًا — اضغط «المخفية» في شريط الفلترة
+              لعرضه أو إظهاره مجددًا.
+            </p>
+          ) : null}
+        </>
       )}
 
       {!loading && !error && orders.length > 0 && filteredOrders.length === 0 && (

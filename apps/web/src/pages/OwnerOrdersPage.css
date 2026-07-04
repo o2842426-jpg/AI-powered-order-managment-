@@ -218,6 +218,12 @@
   color: #6b7280;
 }
 
+.owner-orders__empty--hint {
+  margin-top: 0.35rem;
+  color: #7c3aed;
+  font-size: 0.95rem;
+}
+
 .owner-orders__error {
   margin-top: 1rem;
   padding: 0.75rem 1rem;

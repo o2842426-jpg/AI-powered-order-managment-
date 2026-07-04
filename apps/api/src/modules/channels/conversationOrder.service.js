@@ -5,9 +5,22 @@ const {
   getConversationLinkedOrderId,
 } = require("./channel.repository");
 
+const TERMINAL_ORDER_STATUSES = new Set(["shipped", "delivered", "cancelled"]);
+
+function normalizeIraqiPhone(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (digits.startsWith("964") && digits.length >= 12) {
+    return `0${digits.slice(3, 13)}`;
+  }
+  if (digits.length === 10 && digits.startsWith("7")) {
+    return `0${digits}`;
+  }
+  return digits;
+}
+
 /**
  * Clear stale linked_order_id left by pre–hard-reset deploys or wrong-store links.
- * Allows a new checkout when the customer picks a different product.
+ * Allows a new checkout when the customer picks a different product or phone.
  *
  * @param {number} conversationId
  * @param {number} storeId
@@ -19,21 +32,40 @@ function reconcileConversationLinkedOrder(conversationId, storeId, orderState = 
     return { linkedOrderId: null, existingOrderId: null, isHidden: false };
   }
 
-  const clearLink = () => {
+  const clearLink = (reason) => {
     db.prepare(
       `UPDATE channel_conversations SET linked_order_id = NULL WHERE id = ?`
     ).run(conversationId);
+    console.info(
+      `[channel-order] cleared linked_order_id=${linkedId} conversation=${conversationId} (${reason})`
+    );
   };
 
   const order = db
-    .prepare(`SELECT id, store_id, is_hidden FROM orders WHERE id = ?`)
+    .prepare(
+      `
+        SELECT o.id, o.store_id, o.is_hidden, o.status, c.phone AS customer_phone
+        FROM orders o
+        LEFT JOIN customers c ON c.id = o.customer_id
+        WHERE o.id = ?
+      `
+    )
     .get(linkedId);
 
   if (!order || Number(order.store_id) !== Number(storeId)) {
-    clearLink();
-    console.info(
-      `[channel-order] cleared stale linked_order_id=${linkedId} conversation=${conversationId} (missing or wrong store)`
-    );
+    clearLink("missing or wrong store");
+    return { linkedOrderId: null, existingOrderId: null, isHidden: false };
+  }
+
+  if (TERMINAL_ORDER_STATUSES.has(String(order.status || "").trim())) {
+    clearLink(`linked order status=${order.status}`);
+    return { linkedOrderId: null, existingOrderId: null, isHidden: false };
+  }
+
+  const linkedPhone = normalizeIraqiPhone(order.customer_phone);
+  const currentPhone = normalizeIraqiPhone(orderState.customer_phone);
+  if (linkedPhone && currentPhone && linkedPhone !== currentPhone) {
+    clearLink(`phone changed ${linkedPhone} → ${currentPhone}`);
     return { linkedOrderId: null, existingOrderId: null, isHidden: false };
   }
 
@@ -48,10 +80,7 @@ function reconcileConversationLinkedOrder(conversationId, storeId, orderState = 
     linkedProductId &&
     currentProductId !== linkedProductId
   ) {
-    clearLink();
-    console.info(
-      `[channel-order] cleared linked_order_id=${linkedId} conversation=${conversationId} (new product ${currentProductId} ≠ linked ${linkedProductId})`
-    );
+    clearLink(`new product ${currentProductId} ≠ linked ${linkedProductId}`);
     return { linkedOrderId: null, existingOrderId: null, isHidden: false };
   }
 
