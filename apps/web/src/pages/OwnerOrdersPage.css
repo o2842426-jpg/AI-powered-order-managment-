@@ -158,6 +158,54 @@
   color: var(--dm-color-primary);
 }
 
+.owner-orders__filters button.is-archive {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.owner-orders__filters button.is-archive.is-active {
+  border-color: #9ca3af;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.owner-orders__filter-badge--muted {
+  background: #9ca3af !important;
+}
+
+.owner-orders__hide-btn,
+.owner-orders__unhide-btn {
+  padding: 0.38rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.owner-orders__hide-btn {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.owner-orders__hide-btn--compact {
+  padding: 0.28rem 0.55rem;
+  font-size: 0.75rem;
+}
+
+.owner-orders__unhide-btn {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.owner-orders__visibility-actions {
+  margin-top: 0.75rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
 .owner-orders__field input {
   padding: 0.5rem 0.65rem;
   border: 1px solid #d1d5db;

@@ -41,7 +41,10 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
     shipped: 0,
     delivered: 0,
     cancelled: 0,
+    hidden: 0,
   });
+  const [showHiddenOrders, setShowHiddenOrders] = useState(false);
+  const [visibilitySaving, setVisibilitySaving] = useState(false);
   const [internalSearch, setInternalSearch] = useState('');
   const controlled = typeof onSearchChange === 'function';
   const searchTerm = controlled ? (controlledSearch ?? '') : internalSearch;
@@ -116,7 +119,8 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
         setLoading(false);
         return;
       }
-      const url = `/api/orders?store_id=${encodeURIComponent(storeId)}`;
+      const hiddenQs = showHiddenOrders ? '&hidden_only=1' : '';
+      const url = `/api/orders?store_id=${encodeURIComponent(storeId)}${hiddenQs}`;
       const countsUrl = `/api/orders/status-counts?store_id=${encodeURIComponent(storeId)}`;
 
       try {
@@ -159,7 +163,55 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [storeId]);
+  }, [storeId, showHiddenOrders]);
+
+  async function setOrderHidden(orderId, hidden) {
+    setVisibilitySaving(true);
+    setStatusMessage(null);
+    try {
+      const res = await authFetch(`/api/orders/${orderId}/visibility`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hidden }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throwIfNotOk(res, body, { fallback: 'تعذّر تحديث إظهار الطلب.' });
+      }
+      if (selectedOrderId === orderId && hidden) {
+        setSelectedOrderId(null);
+        setOrderDetail(null);
+      }
+      setOrders((prev) =>
+        hidden && !showHiddenOrders
+          ? prev.filter((row) => row.id !== orderId)
+          : prev.map((row) =>
+              row.id === orderId
+                ? { ...row, is_hidden: hidden ? 1 : 0 }
+                : row
+            )
+      );
+      if (orderDetail?.order?.id === orderId) {
+        setOrderDetail((prev) =>
+          prev?.order
+            ? { ...prev, order: { ...prev.order, is_hidden: hidden ? 1 : 0 } }
+            : prev
+        );
+      }
+      setStatusMessage(hidden ? 'تم إخفاء الطلب من القائمة.' : 'تم إرجاع الطلب للقائمة.');
+      const countsRes = await authFetch(
+        `/api/orders/status-counts?store_id=${encodeURIComponent(storeId)}`
+      );
+      const countsBody = await countsRes.json().catch(() => ({}));
+      if (countsRes.ok && countsBody?.data) {
+        setStatusCounts((prev) => ({ ...prev, ...countsBody.data }));
+      }
+    } catch (e) {
+      setStatusMessage(userErrorMessage(e, { fallback: 'تعذّر تحديث إظهار الطلب.' }));
+    } finally {
+      setVisibilitySaving(false);
+    }
+  }
 
   async function saveOrderStatus() {
     if (!selectedOrderId) return;
@@ -422,6 +474,27 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
           {statusMessage && (
             <p className="owner-orders__status-msg">{statusMessage}</p>
           )}
+          <div className="owner-orders__visibility-actions">
+            {Number(orderDetail.order?.is_hidden) === 1 ? (
+              <button
+                type="button"
+                className="owner-orders__unhide-btn"
+                disabled={visibilitySaving}
+                onClick={() => void setOrderHidden(selectedOrderId, false)}
+              >
+                {visibilitySaving ? 'جاري التحديث…' : 'إرجاع للقائمة'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="owner-orders__hide-btn"
+                disabled={visibilitySaving}
+                onClick={() => void setOrderHidden(selectedOrderId, true)}
+              >
+                {visibilitySaving ? 'جاري الإخفاء…' : 'إخفاء من القائمة'}
+              </button>
+            )}
+          </div>
         </section>
 
         <section className="owner-orders__detail-block">
@@ -503,7 +576,24 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
           </label>
         )}
         <div className="owner-orders__filters">
-          {['all', ...ORDER_STATUSES].map((status) => {
+          <button
+            type="button"
+            className={showHiddenOrders ? 'is-active is-archive' : 'is-archive'}
+            onClick={() => {
+              setShowHiddenOrders((v) => !v);
+              setSelectedOrderId(null);
+              setOrderDetail(null);
+            }}
+          >
+            {showHiddenOrders ? 'الطلبات النشطة' : 'المخفية'}
+            {!showHiddenOrders && statusCounts.hidden > 0 ? (
+              <span className="owner-orders__filter-badge owner-orders__filter-badge--muted">
+                {statusCounts.hidden}
+              </span>
+            ) : null}
+          </button>
+          {!showHiddenOrders &&
+            ['all', ...ORDER_STATUSES].map((status) => {
             const count =
               status === 'all' ? statusCounts.all : statusCounts[status] ?? 0;
             return (
@@ -533,7 +623,11 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
       )}
 
       {!loading && !error && orders.length === 0 && (
-        <p className="owner-orders__empty">لا توجد طلبات لهذا المتجر.</p>
+        <p className="owner-orders__empty">
+          {showHiddenOrders
+            ? 'لا توجد طلبات مخفية.'
+            : 'لا توجد طلبات لهذا المتجر.'}
+        </p>
       )}
 
       {!loading && !error && orders.length > 0 && filteredOrders.length === 0 && (
@@ -592,6 +686,25 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
                   <button type="button" onClick={() => openOrderDetails(row.id)}>
                     {selectedOrderId === row.id ? 'إغلاق' : 'التفاصيل'}
                   </button>
+                  {!showHiddenOrders ? (
+                    <button
+                      type="button"
+                      className="owner-orders__hide-btn owner-orders__hide-btn--compact"
+                      disabled={visibilitySaving}
+                      onClick={() => void setOrderHidden(row.id, true)}
+                    >
+                      إخفاء
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="owner-orders__unhide-btn owner-orders__hide-btn--compact"
+                      disabled={visibilitySaving}
+                      onClick={() => void setOrderHidden(row.id, false)}
+                    >
+                      إرجاع
+                    </button>
+                  )}
                 </div>
                 {selectedOrderId === row.id && renderSelectedOrderDetail()}
               </article>

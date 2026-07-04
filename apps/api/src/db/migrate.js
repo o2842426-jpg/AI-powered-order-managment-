@@ -25,6 +25,7 @@ function migrate(db) {
   ensureChannelOrderStateColumns(db);
   ensureProductImagesTable(db);
   ensureSalesExamplesTable(db);
+  ensureOrderHiddenColumn(db);
 }
 
 function ensureStoreSettingsColumns(db) {
@@ -382,6 +383,19 @@ function ensureChannelOrderStateColumns(db) {
       db.exec(`ALTER TABLE channel_conversations ADD COLUMN ${name} ${ddl}`);
     }
   }
+}
+
+function ensureOrderHiddenColumn(db) {
+  const columns = db.prepare("PRAGMA table_info(orders)").all();
+  const names = new Set(columns.map((c) => c.name));
+  if (!names.has("is_hidden")) {
+    db.exec(
+      "ALTER TABLE orders ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0 CHECK (is_hidden IN (0, 1))"
+    );
+  }
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_orders_store_visible ON orders(store_id, is_hidden, id DESC)"
+  );
 }
 
 function ensureSalesExamplesTable(db) {

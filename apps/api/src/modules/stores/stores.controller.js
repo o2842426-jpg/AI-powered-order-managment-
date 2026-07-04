@@ -164,7 +164,9 @@ function getStoreSummary(req, res) {
       .get(storeId);
 
     const newOrders = db
-      .prepare("SELECT COUNT(*) AS count FROM orders WHERE store_id = ? AND status = 'new'")
+      .prepare(
+        "SELECT COUNT(*) AS count FROM orders WHERE store_id = ? AND status = 'new' AND is_hidden = 0"
+      )
       .get(storeId);
 
     const lowStock = db

@@ -11,11 +11,17 @@ function getOrderStatusCountsForStore(storeId) {
       `
         SELECT status, COUNT(*) AS count
         FROM orders
-        WHERE store_id = ?
+        WHERE store_id = ? AND is_hidden = 0
         GROUP BY status
       `
     )
     .all(storeId);
+
+  const hiddenRow = db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM orders WHERE store_id = ? AND is_hidden = 1`
+    )
+    .get(storeId);
 
   /** @type {Record<string, number>} */
   const counts = {
@@ -25,6 +31,7 @@ function getOrderStatusCountsForStore(storeId) {
     shipped: 0,
     delivered: 0,
     cancelled: 0,
+    hidden: Number(hiddenRow?.count) || 0,
   };
 
   for (const row of rows) {
