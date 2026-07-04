@@ -23,7 +23,6 @@ const {
   saveConversationOrderState,
   getConversationOrderState,
   getConversationLinkedOrderId,
-  resetConversationOrderCanvas,
 } = require("./channel.repository");
 const { resolvePublicMediaUrl } = require("../../lib/publicMediaUrl");
 const {
@@ -429,21 +428,8 @@ async function processChannelAiReply({
     });
     if (orderResult.created) {
       console.info(
-        `[channel-ai] order persisted conversation=${conversationId} order_id=${orderResult.order_id}`
+        `[channel-ai] order persisted conversation=${conversationId} order_id=${orderResult.order_id} (state hard-reset in DB transaction)`
       );
-      setImmediate(() => {
-        try {
-          resetConversationOrderCanvas(conversationId);
-          console.info(
-            `[channel-ai] order canvas reset conversation=${conversationId} after order=${orderResult.order_id}`
-          );
-        } catch (err) {
-          console.error(
-            `[channel-ai] order canvas reset failed conversation=${conversationId}:`,
-            err?.message || err
-          );
-        }
-      });
     }
   }
 

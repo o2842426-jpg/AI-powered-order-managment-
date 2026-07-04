@@ -1,5 +1,6 @@
 const { db } = require("../../db/client");
 const { ORDER_STATES } = require("./orderState.constants");
+const { hardResetConversationOrderState } = require("./channel.repository");
 
 /**
  * @param {object} orderState
@@ -188,16 +189,8 @@ function createOrderFromConversationState({
 
     db.prepare(`UPDATE orders SET total_amount = ? WHERE id = ?`).run(lineTotal, orderId);
 
-    db.prepare(
-      `
-        UPDATE channel_conversations
-        SET
-          linked_order_id = ?,
-          order_state = ?,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `
-    ).run(orderId, ORDER_STATES.CONFIRMED, conversationId);
+    // Hard reset in the same transaction — canvas clear for the next order in this DM thread.
+    hardResetConversationOrderState(conversationId);
 
     return {
       order_id: orderId,
@@ -208,7 +201,7 @@ function createOrderFromConversationState({
   })();
 
   console.info(
-    `[channel-order] created order=${created.order_id} conversation=${conversationId} store=${storeId} product=${productId}`
+    `[channel-order] created order=${created.order_id} conversation=${conversationId} store=${storeId} product=${productId} — canvas hard-reset`
   );
 
   return { created: true, ...created };

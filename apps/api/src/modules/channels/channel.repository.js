@@ -403,7 +403,7 @@ function getConversationLinkedOrderId(conversationId) {
   return id != null && Number(id) > 0 ? Number(id) : null;
 }
 
-function resetConversationOrderCanvas(conversationId) {
+function hardResetConversationOrderState(conversationId) {
   db.prepare(
     `
       UPDATE channel_conversations
@@ -411,9 +411,9 @@ function resetConversationOrderCanvas(conversationId) {
         order_state = 'AWAITING_PRODUCT',
         order_product_id = NULL,
         order_product_name = NULL,
-        customer_city = NULL,
-        customer_phone = NULL,
         customer_name = NULL,
+        customer_phone = NULL,
+        customer_city = NULL,
         customer_address = NULL,
         payment_method = NULL,
         buy_committed = 0,
@@ -422,6 +422,10 @@ function resetConversationOrderCanvas(conversationId) {
       WHERE id = ?
     `
   ).run(conversationId);
+}
+
+function resetConversationOrderCanvas(conversationId) {
+  hardResetConversationOrderState(conversationId);
 }
 
 /**
@@ -806,6 +810,7 @@ module.exports = {
   getConversationOrderState,
   saveConversationOrderState,
   getConversationLinkedOrderId,
+  hardResetConversationOrderState,
   resetConversationOrderCanvas,
   insertOutboundChannelMessage,
   getChannelConversationForStore,
