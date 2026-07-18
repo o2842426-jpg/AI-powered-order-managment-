@@ -608,8 +608,19 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                     onClick={() => openSession(row.id)}
                   >
                     <span className="owner-conv__session-id">
-                      إنستغرام #{row.id}
+                      {row.customer_handle ? (
+                        <span className="owner-conv__handle" dir="ltr">
+                          {row.customer_handle}
+                        </span>
+                      ) : (
+                        <>إنستغرام #{row.id}</>
+                      )}
                       <span className="owner-conv__ig-pill">DM</span>
+                      {Number(row.is_human_takeover) === 1 ? (
+                        <span className="owner-conv__human-flag" role="alert">
+                          مطلوب تدخل بشري ⚠️
+                        </span>
+                      ) : null}
                       {Number(row.owner_takeover) === 1 ? (
                         <span className="owner-conv__takeover-pill">يدوي</span>
                       ) : null}
@@ -631,9 +642,15 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                       {formatDt(row.last_message_at || row.started_at)}
                       {row.message_count != null ? ` · ${row.message_count} رسالة` : ""}
                     </span>
-                    {(row.customer_name || row.customer_phone || row.platform_username) && (
+                    {(row.customer_name ||
+                      row.customer_phone ||
+                      row.customer_handle ||
+                      row.platform_username) && (
                       <span className="owner-conv__session-customer" dir="auto">
-                        {row.customer_name || row.platform_username || "عميل DM"}
+                        {row.customer_name ||
+                          row.customer_handle ||
+                          row.platform_username ||
+                          "عميل DM"}
                         {row.customer_phone ? ` · ${row.customer_phone}` : ""}
                       </span>
                     )}
@@ -662,6 +679,11 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
           )}
           {detail?.conversation && (
             <>
+              {Number(detail.conversation.is_human_takeover) === 1 ? (
+                <div className="owner-conv__human-banner" role="alert">
+                  مطلوب تدخل بشري ⚠️ — طلب العميل التحدث مع الإدارة. الـ AI متوقف حتى تتولى المحادثة.
+                </div>
+              ) : null}
               {Number(detail.conversation.owner_takeover) === 1 ? (
                 <div className="owner-conv__takeover-banner" role="status">
                   الـ AI صامت الآن — أنت تتحكم بالمحادثة على إنستغرام
@@ -669,7 +691,13 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
               ) : null}
               <div className="owner-conv__detail-head">
                 <h2>
-                  محادثة إنستغرام #{detail.conversation.id}
+                  {detail.conversation.customer_handle ? (
+                    <span className="owner-conv__handle" dir="ltr">
+                      {detail.conversation.customer_handle}
+                    </span>
+                  ) : (
+                    <>محادثة إنستغرام #{detail.conversation.id}</>
+                  )}
                   {canLiveOrderState && detail.conversation.order ? (
                     <OrderStateBadge order={detail.conversation.order} />
                   ) : null}
@@ -695,12 +723,21 @@ export function OwnerConversationsPage({ billingStatus, onGoUpgrade }) {
                 ) : null}
                 {(detail.conversation.customer_name ||
                   detail.conversation.customer_phone ||
+                  detail.conversation.customer_handle ||
                   detail.conversation.platform_username) && (
                   <p className="owner-conv__detail-customer" dir="auto">
                     <strong>العميل:</strong>{" "}
                     {detail.conversation.customer_name ||
+                      detail.conversation.customer_handle ||
                       detail.conversation.platform_username ||
                       "—"}
+                    {detail.conversation.customer_handle &&
+                    detail.conversation.customer_name ? (
+                      <span className="owner-conv__handle-inline" dir="ltr">
+                        {" "}
+                        ({detail.conversation.customer_handle})
+                      </span>
+                    ) : null}
                     {detail.conversation.customer_phone
                       ? ` — ${detail.conversation.customer_phone}`
                       : ""}

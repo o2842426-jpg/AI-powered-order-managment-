@@ -8,6 +8,7 @@ const ACCEPTED_WEBHOOK_OBJECTS = new Set(["instagram", "page"]);
  * @returns {Array<{
  *   mid: string,
  *   senderIgsid: string,
+ *   senderHandle: string | null,
  *   recipientIgId: string,
  *   text: string,
  *   imageUrls: string[],
@@ -38,6 +39,35 @@ function extractInboundImageUrls(message) {
   }
 
   return urls;
+}
+
+/**
+ * Best-effort extraction of the sender's human-readable handle (Instagram username or
+ * display name) from a messaging event. Meta's payload shape varies by product/version,
+ * so we probe the known locations and normalize (strip a leading "@").
+ *
+ * @param {object} item — one entry.messaging[] element
+ * @returns {string | null}
+ */
+function extractSenderHandle(item) {
+  const candidates = [
+    item?.sender?.username,
+    item?.sender?.name,
+    item?.message?.from?.username,
+    item?.message?.from?.name,
+    item?.user_profile?.username,
+    item?.user_profile?.name,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate == null) continue;
+    const handle = String(candidate).trim().replace(/^@+/, "").trim();
+    if (handle) {
+      return handle.slice(0, 120);
+    }
+  }
+
+  return null;
 }
 
 function parseInstagramMessagingEvents(payload) {
@@ -90,6 +120,7 @@ function parseInstagramMessagingEvents(payload) {
       events.push({
         mid,
         senderIgsid,
+        senderHandle: extractSenderHandle(item),
         recipientIgId,
         text,
         imageUrls,
@@ -103,4 +134,8 @@ function parseInstagramMessagingEvents(payload) {
   return events;
 }
 
-module.exports = { parseInstagramMessagingEvents, extractInboundImageUrls };
+module.exports = {
+  parseInstagramMessagingEvents,
+  extractInboundImageUrls,
+  extractSenderHandle,
+};

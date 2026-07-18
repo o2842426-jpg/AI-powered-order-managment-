@@ -376,6 +376,10 @@ function ensureChannelOrderStateColumns(db) {
     ["payment_method", "TEXT"],
     ["buy_committed", "INTEGER NOT NULL DEFAULT 0"],
     ["linked_order_id", "INTEGER"],
+    // Human-readable social identity (e.g. Instagram username/display name) for dashboard.
+    ["customer_handle", "TEXT"],
+    // Set to 1 when the customer asks for a human/manager — mutes the AI and flags the dashboard.
+    ["is_human_takeover", "INTEGER NOT NULL DEFAULT 0"],
   ];
 
   for (const [name, ddl] of additions) {

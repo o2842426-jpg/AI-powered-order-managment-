@@ -85,6 +85,21 @@ function customerExplicitlyRequestsImages(text) {
   return IMAGE_REQUEST.test(String(text || "").trim());
 }
 
+/**
+ * Customer explicitly asks to talk to a human / manager / administration / support agent.
+ * Triggers the human handover protocol (mutes the AI + flags the dashboard).
+ */
+const HUMAN_AGENT_REQUEST =
+  /(?:اريد|أريد|ابي|أبي|احتاج|أحتاج|ممكن|رجاء|لو\s*سمحت)?\s*(?:احچي|احكي|اتكلم|أتكلم|اكلم|أكلم|تواصل|حولني|حوّلني|وصلني)?\s*(?:مع|على|ويا)?\s*(?:ال)?(?:ادار[ةه]|إدار[ةه]|مدير|المدير|موظف|موضف|موظّف|بشر|انسان|إنسان|آدمي|ادمي|شخص\s*حقيقي|خدمة\s*العملاء|خدمة\s*الزبائن|الدعم|السبورت)|(?:مو|مب|مش)\s*(?:بوت|روبوت|رد\s*آلي|رد\s*الي)|human|real\s*person|customer\s*service|support|agent|representative/i;
+
+/**
+ * @param {string} text
+ * @returns {boolean}
+ */
+function customerRequestsHumanAgent(text) {
+  return HUMAN_AGENT_REQUEST.test(String(text || "").trim());
+}
+
 const CITY_PATTERN = new RegExp(
   `(?:محافظتي|محافظة|عنوان\\s*التوصيل|توصيل\\s*(?:إلى|الى|ل|لي)?|أنا\\s*من|انا\\s*من)\\s*[:\\-]?\\s*(${IRAQI_GOVERNORATES.join("|")})`,
   "i"
@@ -520,6 +535,7 @@ module.exports = {
   inferProductFromText,
   syncOrderStateAfterInbound,
   customerExplicitlyRequestsImages,
+  customerRequestsHumanAgent,
   shouldAttachProductImages,
   orderStateToCheckoutContext,
   orderStateToConversationPhase,

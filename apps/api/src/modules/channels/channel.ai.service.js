@@ -22,6 +22,7 @@ const {
   insertOutboundChannelMessage,
   saveConversationOrderState,
   getConversationOrderState,
+  setConversationHumanTakeover,
 } = require("./channel.repository");
 const { resolvePublicMediaUrl } = require("../../lib/publicMediaUrl");
 const {
@@ -33,6 +34,7 @@ const {
   syncOrderStateAfterInbound,
   shouldAttachProductImages,
   customerExplicitlyRequestsImages,
+  customerRequestsHumanAgent,
   orderStateToCheckoutContext,
   orderStateToConversationPhase,
   computeOrderState,
@@ -101,6 +103,10 @@ function collectDmProductImageUrls(products, recommendedIds) {
 
   return urls;
 }
+
+/** Single warm line sent once when the customer is handed off to a human agent. */
+const HUMAN_HANDOVER_MESSAGE =
+  "تدلل عيوني الغالي، الحين راح أحولك على موظف من الإدارة يتابع وياك تفاصيلك فوراً. ثواني وياك.";
 
 const SKIP_NOTICE_MESSAGES = {
   trial_expired:
@@ -235,6 +241,41 @@ async function processChannelAiReply({
   if (Number(conversation.owner_takeover) === 1) {
     console.info(
       `[channel-ai] skip conversation=${conversationId} — takeover active`
+    );
+    return;
+  }
+
+  // Human Handover Protocol: once flagged, the AI stays fully muted until the owner
+  // acts on the conversation (the takeover toggle clears is_human_takeover).
+  if (Number(conversation.is_human_takeover) === 1) {
+    console.info(
+      `[channel-ai] skip conversation=${conversationId} — human handover active`
+    );
+    return;
+  }
+
+  // Trigger turn: customer explicitly asks for a human/manager/support agent.
+  if (customerRequestsHumanAgent(inboundText)) {
+    setConversationHumanTakeover(conversationId, storeId);
+
+    const sendResult = await sendInstagramTextWithEncryptedToken({
+      connection,
+      recipientIgsid: customerIgsid,
+      text: HUMAN_HANDOVER_MESSAGE,
+    });
+
+    insertOutboundChannelMessage({
+      conversationId,
+      storeId,
+      mid: sendResult.ok ? sendResult.messageId : null,
+      text: HUMAN_HANDOVER_MESSAGE,
+      senderType: "system",
+      deliveryStatus: sendResult.ok ? "sent" : "failed",
+      payload: { human_handover: true, ...(sendResult.ok ? {} : { send_error: sendResult.error }) },
+    });
+
+    console.info(
+      `[channel-ai] human handover triggered conversation=${conversationId} store=${storeId} — AI muted, dashboard flagged`
     );
     return;
   }

@@ -78,9 +78,14 @@ function upsertConversationForInbound({
   storeId,
   connectionId,
   senderIgsid,
+  senderHandle = null,
   messageAt,
 }) {
   const at = messageAt || new Date().toISOString();
+  const handle =
+    senderHandle != null && String(senderHandle).trim() !== ""
+      ? String(senderHandle).trim().slice(0, 120)
+      : null;
 
   const existing = db
     .prepare(
@@ -93,16 +98,18 @@ function upsertConversationForInbound({
     .get(storeId, PLATFORM, senderIgsid);
 
   if (existing) {
+    // COALESCE keeps an existing handle when this event carries none (payload often omits it).
     db.prepare(
       `
         UPDATE channel_conversations
         SET
+          customer_handle = COALESCE(?, customer_handle),
           last_message_at = ?,
           last_customer_message_at = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `
-    ).run(at, at, existing.id);
+    ).run(handle, at, at, existing.id);
     return { id: existing.id };
   }
 
@@ -115,16 +122,68 @@ function upsertConversationForInbound({
           platform,
           platform_thread_id,
           platform_user_id,
+          customer_handle,
           last_message_at,
           last_customer_message_at,
           status
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'open')
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'open')
       `
     )
-    .run(storeId, connectionId, PLATFORM, senderIgsid, senderIgsid, at, at);
+    .run(storeId, connectionId, PLATFORM, senderIgsid, senderIgsid, handle, at, at);
 
   return { id: Number(result.lastInsertRowid) };
+}
+
+/**
+ * Persist a resolved social handle onto a conversation when it's still missing.
+ * Used by the best-effort Graph profile lookup in the AI reply path.
+ *
+ * @param {number} conversationId
+ * @param {string} handle
+ * @returns {boolean} true when a value was written
+ */
+function setConversationCustomerHandle(conversationId, handle) {
+  const clean =
+    handle != null && String(handle).trim() !== ""
+      ? String(handle).trim().replace(/^@+/, "").slice(0, 120)
+      : null;
+  if (!clean) return false;
+
+  const result = db
+    .prepare(
+      `
+        UPDATE channel_conversations
+        SET customer_handle = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+          AND (customer_handle IS NULL OR TRIM(customer_handle) = '')
+      `
+    )
+    .run(clean, conversationId);
+
+  return result.changes > 0;
+}
+
+/**
+ * Human Handover Protocol: flag a conversation as requiring a human agent.
+ * This mutes the AI (checked in the reply pipeline) and raises the dashboard alert.
+ *
+ * @param {number} conversationId
+ * @param {number} storeId
+ * @returns {boolean}
+ */
+function setConversationHumanTakeover(conversationId, storeId) {
+  const result = db
+    .prepare(
+      `
+        UPDATE channel_conversations
+        SET is_human_takeover = 1, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND store_id = ?
+      `
+    )
+    .run(conversationId, storeId);
+
+  return result.changes > 0;
 }
 
 /**
@@ -224,6 +283,7 @@ function persistInboundDmEvent(event) {
       storeId: connection.store_id,
       connectionId: connection.id,
       senderIgsid: event.senderIgsid,
+      senderHandle: event.senderHandle,
       messageAt,
     });
 
@@ -302,7 +362,9 @@ function getConversationById(conversationId) {
             channel_connection_id,
             platform_thread_id,
             platform_user_id,
+            customer_handle,
             owner_takeover,
+            is_human_takeover,
             status
           FROM channel_conversations
           WHERE id = ?
@@ -591,8 +653,10 @@ function getChannelConversationForStore(conversationId, storeId) {
             platform_thread_id,
             platform_user_id,
             platform_username,
+            customer_handle,
             customer_id,
             owner_takeover,
+            is_human_takeover,
             lead_score,
             lead_score_reason,
             lead_scored_at,
@@ -636,12 +700,15 @@ function updateChannelConversationTakeover({
 }) {
   const flag = ownerTakeover ? 1 : 0;
 
+  // Any owner takeover action clears the "needs human" alert: engaging handles it,
+  // disengaging hands control back to the AI (otherwise it would stay muted forever).
   const result = db
     .prepare(
       `
         UPDATE channel_conversations
         SET
           owner_takeover = ?,
+          is_human_takeover = 0,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND store_id = ?
       `
@@ -812,6 +879,8 @@ module.exports = {
   getConversationLinkedOrderId,
   hardResetConversationOrderState,
   resetConversationOrderCanvas,
+  setConversationCustomerHandle,
+  setConversationHumanTakeover,
   insertOutboundChannelMessage,
   getChannelConversationForStore,
   updateChannelConversationTakeover,

@@ -94,6 +94,7 @@ function listChannelConversations(req, res) {
             cc.platform_thread_id,
             cc.platform_user_id,
             cc.platform_username,
+            cc.customer_handle,
             cc.customer_id,
             cc.owner_takeover,
             cc.lead_score,

@@ -73,6 +73,42 @@ function buildStrictExecutionRules(state) {
 }
 
 /**
+ * Hard code-level phase split driven by DB flags (buy_committed + order_state),
+ * not loose textual hints. Prevents premature data-gathering during discovery.
+ *
+ * @param {object} state
+ * @returns {string}
+ */
+function buildConditionalPhaseRules(state) {
+  const buyCommitted = Number(state.buy_committed) === 1 ? 1 : 0;
+  const orderState = state.order_state || ORDER_STATES.AWAITING_PRODUCT;
+
+  if (buyCommitted === 0) {
+    return `
+# CURRENT PHASE: DISCOVERY/BROWSING MODE
+- The customer has NOT committed to buying yet.
+- You are **STRICTLY PROHIBITED** from using phrases like "دز لي اسمك", "رقم تليفونك", "عنوانك", or "للتوصيل".
+- Focus 100% on answering their product questions, showing inventory images, and describing materials. Do not rush the pipeline.
+`.trim();
+  }
+
+  if (buyCommitted === 1 && orderState !== ORDER_STATES.CONFIRMED) {
+    return `
+# CURRENT PHASE: CHECKOUT/DATA GATHERING MODE
+- The customer has explicitly signaled buying intent.
+- You are now authorized to politely extract missing order fields one by one (Name -> Phone -> City) based on what is currently missing in the database context rows.
+- Ask for ONE missing field per message; never re-ask a field already marked SAVED above.
+`.trim();
+  }
+
+  return `
+# CURRENT PHASE: ORDER CONFIRMED
+- The order is locked in. Do not ask for any personal data again.
+- Only confirm delivery timing if the customer asks.
+`.trim();
+}
+
+/**
  * Dynamic system-prompt block injected from SQLite order state.
  * @param {object} state
  */
@@ -96,16 +132,20 @@ function buildDynamicOrderStateBlock(state) {
 
   const goal = getCurrentGoalString(state);
   const strict = buildStrictExecutionRules(state);
+  const conditionalRules = buildConditionalPhaseRules(state);
 
   return `
 # CURRENT ORDER STATE (authoritative — from database):
 - order_state: ${state.order_state || ORDER_STATES.AWAITING_PRODUCT}
+- buy_committed: ${Number(state.buy_committed) === 1 ? 1 : 0}
 - Target Product: ${productName}
 - Customer Name: ${customerName}
 - Customer Location: ${city}
 - Customer Phone: ${phone}
 - Payment: ${payment}
 - Current Goal: ${goal}
+
+${conditionalRules}
 
 # STRICT EXECUTION FOR THIS TURN:
 ${strict}
@@ -114,6 +154,7 @@ ${strict}
 
 module.exports = {
   buildDynamicOrderStateBlock,
+  buildConditionalPhaseRules,
   getCurrentGoalString,
   buildStrictExecutionRules,
 };
