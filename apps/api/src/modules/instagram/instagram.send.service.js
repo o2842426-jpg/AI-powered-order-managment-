@@ -75,6 +75,10 @@ async function sendInstagramApiMessage({
       data?.error?.message ||
       data?.error?.error_user_msg ||
       `graph_http_${res.status}`;
+    const errorCode = data?.error?.code ?? null;
+    const errorSubcode = data?.error?.error_subcode ?? null;
+    const tokenInvalidated =
+      Number(errorCode) === 190 || Number(errorCode) === 102;
     console.warn("[instagram-send] graph error", {
       pageId: normalizedPageId || null,
       recipientIgsid: normalizedRecipientIgsid,
@@ -82,12 +86,22 @@ async function sendInstagramApiMessage({
       graph: {
         message: data?.error?.message || null,
         type: data?.error?.type || null,
-        code: data?.error?.code ?? null,
-        error_subcode: data?.error?.error_subcode ?? null,
+        code: errorCode,
+        error_subcode: errorSubcode,
         fbtrace_id: data?.error?.fbtrace_id || null,
       },
     });
-    return { ok: false, error: String(err), status: res.status };
+    if (tokenInvalidated) {
+      console.error(
+        `[instagram-send] ⚠️ ACCESS TOKEN INVALID (code=${errorCode} subcode=${errorSubcode}) pageId=${normalizedPageId || "?"} — outbound replies will keep failing. ACTION: reconnect Instagram from the store dashboard (Settings → ربط إنستغرام) to refresh the token.`
+      );
+    }
+    return {
+      ok: false,
+      error: String(err),
+      status: res.status,
+      tokenInvalidated,
+    };
   }
 
   const messageId = data?.message_id != null ? String(data.message_id) : "";

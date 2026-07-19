@@ -337,6 +337,19 @@ export function OwnerDashboardPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- إعادة التحميل عند تغيّر المتجر فقط
   }, [storeId]);
 
+  // Live refresh of the overview KPIs (Total Orders / Revenue / Recent Activity)
+  // so orders created by the AI over Instagram DMs appear without a manual reload.
+  useEffect(() => {
+    if (!storeId || panel !== "overview") return undefined;
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      loadSummary();
+      loadLowStock();
+    }, 12000);
+    return () => window.clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- استطلاع دوري خفيف أثناء عرض النظرة العامة
+  }, [storeId, panel]);
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [panel]);

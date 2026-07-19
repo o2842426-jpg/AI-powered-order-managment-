@@ -252,7 +252,9 @@ function createOrderFromConversationState({
       : orderState.payment_method || "غير محدد";
   const customerNote = `طلب إنستغرام DM · ${paymentNote}`;
 
-  const created = db.transaction(() => {
+  let created;
+  try {
+    created = db.transaction(() => {
     let customerId = null;
     const existing = db
       .prepare(`SELECT id FROM customers WHERE store_id = ? AND phone = ?`)
@@ -320,10 +322,20 @@ function createOrderFromConversationState({
       total_amount: lineTotal,
       product_name: product.name,
     };
-  })();
+    })();
+  } catch (err) {
+    console.error(
+      `[channel-order] FAILED to persist order conversation=${conversationId} store=${storeId} product=${productId}: ${err?.message || err}`
+    );
+    return {
+      created: false,
+      reason: "db_error",
+      error: err?.message || String(err),
+    };
+  }
 
   console.info(
-    `[channel-order] created order=${created.order_id} conversation=${conversationId} store=${storeId} product=${productId} — canvas hard-reset`
+    `[channel-order] created order=${created.order_id} conversation=${conversationId} store=${storeId} product=${productId} total=${created.total_amount} — canvas hard-reset`
   );
 
   return { created: true, ...created };

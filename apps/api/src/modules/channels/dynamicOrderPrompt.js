@@ -35,6 +35,7 @@ function buildStrictExecutionRules(state) {
     "لا تعيد سؤالاً عن حقل محفوظ أعلاه (SAVED).",
     "لا ترسل recommended_product_ids إلا في AWAITING_PRODUCT وبعد طلب صريح لمنتج جديد.",
     "لا تنهِ الرد بـ «تحب نثبت؟» إذا الزبون قال أصلاً ثبت/كمل/اشتري.",
+    "ممنوع محاولة قفل الطلب أثناء المكاسرة أو طلب الخصم أو السؤال عن التفاصيل العامة (مقاسات/ألوان/توصيات).",
   ];
 
   switch (state.order_state) {
@@ -83,12 +84,22 @@ function buildConditionalPhaseRules(state) {
   const buyCommitted = Number(state.buy_committed) === 1 ? 1 : 0;
   const orderState = state.order_state || ORDER_STATES.AWAITING_PRODUCT;
 
+  // Universal guard against premature/over-eager confirmation — applies before the order is CONFIRMED.
+  const negotiationGuard = `
+# 🚫 قفل التأكيد المبكر (ANTI-OVER-EAGER CONFIRMATION):
+- إذا كان الزبون يفاوض على السعر (مكاسرة)، أو يطلب خصماً، أو يسأل عن تفاصيل عامة (مقاسات، ألوان، خامة، مقارنة، توصيات):
+  ركّز فقط على معالجة اعتراضه، الإجابة على سؤاله، وبناء القيمة. هذه ليست لحظة إغلاق.
+- في هذه الحالة: **ممنوع منعاً باتاً** محاولة قفل/تثبيت الطلب، وممنوع قول «تحب نثبت؟» أو «نكمل الطلب؟»، وممنوع طلب الاسم/الرقم/العنوان.
+- انتقل لطلب تأكيد الحجز **فقط** إذا: (١) وافق الزبون صراحةً على السعر النهائي، أو (٢) أرسل بياناته أو عنوانه من نفسه دون أن تطلبها.`.trim();
+
   if (buyCommitted === 0) {
     return `
 # CURRENT PHASE: DISCOVERY/BROWSING MODE
 - The customer has NOT committed to buying yet.
 - You are **STRICTLY PROHIBITED** from using phrases like "دز لي اسمك", "رقم تليفونك", "عنوانك", or "للتوصيل".
 - Focus 100% on answering their product questions, showing inventory images, and describing materials. Do not rush the pipeline.
+
+${negotiationGuard}
 `.trim();
   }
 
@@ -98,6 +109,9 @@ function buildConditionalPhaseRules(state) {
 - The customer has explicitly signaled buying intent.
 - You are now authorized to politely extract missing order fields one by one (Name -> Phone -> City) based on what is currently missing in the database context rows.
 - Ask for ONE missing field per message; never re-ask a field already marked SAVED above.
+- إذا عاد الزبون للمكاسرة أو طلب خصماً أو استفسر عن تفاصيل عامة: توقّف فوراً عن جمع البيانات، عالج اعتراضه أولاً، ولا تضغط باتجاه التثبيت حتى يوافق على السعر النهائي.
+
+${negotiationGuard}
 `.trim();
   }
 
@@ -146,6 +160,9 @@ function buildDynamicOrderStateBlock(state) {
 - Current Goal: ${goal}
 
 ${conditionalRules}
+
+# PERSONA & TONE:
+- تاجر عراقي محترف وراقٍ: واثق، مقنع، يبني القيمة بهدوء. بدون إلحاح، بدون عبارات آلية مكررة، وبدون افتعال استعجال. دع الزبون يقود قرار الشراء.
 
 # STRICT EXECUTION FOR THIS TURN:
 ${strict}
