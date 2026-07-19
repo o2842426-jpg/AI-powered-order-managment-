@@ -165,6 +165,115 @@ function inferProductFromText(text, products = []) {
 }
 
 /**
+ * Find ALL products referenced in a block of text (multi-item support).
+ * A product matches on a full-name substring, or a strong token overlap (score >= 6).
+ *
+ * @param {string} text
+ * @param {object[]} [products]
+ * @returns {{ order_product_id: number, order_product_name: string }[]}
+ */
+function inferProductsFromText(text, products = []) {
+  const haystack = String(text || "").toLowerCase();
+  if (!haystack.trim()) return [];
+
+  const found = new Map();
+  for (const product of products || []) {
+    const name = String(product.name || "").trim();
+    if (!name) continue;
+
+    const nameLower = name.toLowerCase();
+    if (haystack.includes(nameLower)) {
+      found.set(Number(product.id), name);
+      continue;
+    }
+
+    const tokens = nameLower.split(/[\s\-]+/).filter((t) => t.length >= 4);
+    let score = 0;
+    for (const token of tokens) {
+      if (haystack.includes(token)) score += token.length;
+    }
+    if (score >= 6) {
+      found.set(Number(product.id), name);
+    }
+  }
+
+  return [...found.entries()].map(([id, name]) => ({
+    order_product_id: id,
+    order_product_name: name,
+  }));
+}
+
+/**
+ * Union new product hits into merged.order_product_ids and keep the scalar
+ * order_product_id / order_product_name mirrors in sync (first = primary,
+ * name = joined list for prompt display).
+ *
+ * @param {object} merged
+ * @param {{ order_product_id?: number, order_product_name?: string }[]} hits
+ * @param {object[]} products
+ */
+function accumulateProducts(merged, hits, products = []) {
+  const set = new Set(
+    (Array.isArray(merged.order_product_ids) ? merged.order_product_ids : [])
+      .map(Number)
+      .filter((n) => Number.isFinite(n) && n > 0)
+  );
+  for (const hit of hits || []) {
+    const id = Number(hit?.order_product_id);
+    if (Number.isFinite(id) && id > 0) set.add(id);
+  }
+
+  const ids = [...set];
+  merged.order_product_ids = ids;
+  if (!ids.length) return merged;
+
+  const nameFor = (id) => {
+    const p = (products || []).find((pp) => Number(pp.id) === Number(id));
+    return p ? String(p.name || "").trim() : null;
+  };
+
+  if (
+    !merged.order_product_id ||
+    !ids.includes(Number(merged.order_product_id))
+  ) {
+    merged.order_product_id = ids[0];
+  }
+
+  const names = ids.map(nameFor).filter(Boolean);
+  if (names.length) {
+    merged.order_product_name = names.join(" + ");
+  }
+  return merged;
+}
+
+/**
+ * Heuristic: does this message look like a bare full name reply
+ * (e.g. "محمد أحمد علي") sent when the AI asked for the recipient name?
+ * Deliberately strict to avoid capturing cities, confirmations, or chatter.
+ *
+ * @param {string} text
+ */
+function looksLikePlainName(text) {
+  const t = String(text || "").trim();
+  if (!t) return false;
+  if (/[0-9\u0660-\u0669]/.test(t)) return false; // any digit → not a bare name
+  if (t.length < 5 || t.length > 40) return false;
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length < 2 || words.length > 4) return false;
+  if (new RegExp(`^(?:${IRAQI_GOVERNORATES.join("|")})$`, "i").test(t)) {
+    return false;
+  }
+  if (
+    /شكر|تمام|زين|اوكي|أوكي|نعم|كلش|صور|سعر|توصيل|كاش|خصم|غالي|رخيص|مقاس|لون|ايمي|امي/i.test(
+      t
+    )
+  ) {
+    return false;
+  }
+  return /^[\u0600-\u06FF\s]+$/.test(t);
+}
+
+/**
  * @param {string} text
  */
 function extractFieldsFromMessage(text) {
@@ -190,10 +299,20 @@ function extractFieldsFromMessage(text) {
   }
 
   const nameMatch =
-    t.match(/(?:اسمي|أنا)\s+(.+?)(?:\s*[،,]\s*رقمي|\s+رقمي|\s*[،,]|$)/i) ||
-    t.match(/(?:اسمي|أنا)\s+([^\n]{4,80})/i);
+    t.match(
+      /(?:اسمي|أسمي|اسم\s*المستلم|اسم\s*المستفيد|الاسم\s*الثلاثي|الاسم)\s*[:\-]?\s*(.+?)(?:\s*[،,]\s*رقمي|\s+رقمي|\s*[،,]|$)/i
+    ) ||
+    t.match(/(?:^|[\s،,])أنا\s+([^\n]{4,60})/i) ||
+    t.match(/(?:اسمي|أسمي|الاسم)\s*[:\-]?\s*([^\n]{4,60})/i);
   if (nameMatch) {
-    patch.customer_name = nameMatch[1].trim().replace(/\s+رقمي.*$/i, "").trim();
+    const cleaned = nameMatch[1]
+      .trim()
+      .replace(/\s+رقمي.*$/i, "")
+      .replace(/[0-9\u0660-\u0669].*$/, "") // drop trailing phone/digits
+      .trim();
+    if (cleaned && cleaned.length >= 3) {
+      patch.customer_name = cleaned;
+    }
   }
 
   const addressMatch = t.match(
@@ -328,12 +447,11 @@ function enrichOrderStateFromHistory(row, history, products = []) {
     merged.buy_committed = 1;
   }
 
-  if (merged.buy_committed && !merged.order_product_name) {
-    Object.assign(merged, inferProductFromThread(history, products));
-  }
-
-  if (!merged.order_product_name) {
-    Object.assign(merged, inferProductFromText(lines.join("\n"), products));
+  // Multi-item: union every product referenced across the thread.
+  accumulateProducts(merged, inferProductsFromText(lines.join("\n"), products), products);
+  const threadPrimary = inferProductFromThread(history, products);
+  if (threadPrimary.order_product_id) {
+    accumulateProducts(merged, [threadPrimary], products);
   }
 
   return merged;
@@ -354,6 +472,7 @@ function syncOrderStateAfterInbound(conversationId, inboundText, history, produc
       ...base,
       order_product_id: null,
       order_product_name: null,
+      order_product_ids: [],
       customer_phone: null,
       customer_name: null,
       customer_address: null,
@@ -362,6 +481,7 @@ function syncOrderStateAfterInbound(conversationId, inboundText, history, produc
   }
 
   let merged = enrichOrderStateFromHistory(base, history, products);
+  accumulateProducts(merged, inferProductsFromText(inboundText, products), products);
   const extracted = extractFieldsFromMessage(inboundText);
   const patch = { ...extracted };
 
@@ -375,7 +495,10 @@ function syncOrderStateAfterInbound(conversationId, inboundText, history, produc
     extracted.customer_phone ||
     BUY_SIGNALS.test(historyText)
   ) {
-    Object.assign(merged, inferProductFromThread(history, products));
+    const threadPrimary = inferProductFromThread(history, products);
+    if (threadPrimary.order_product_id) {
+      accumulateProducts(merged, [threadPrimary], products);
+    }
   }
 
   if (patch.buy_confirmed || BUY_SIGNALS.test(String(inboundText || ""))) {
@@ -388,6 +511,11 @@ function syncOrderStateAfterInbound(conversationId, inboundText, history, produc
   };
 
   delete merged.buy_confirmed;
+
+  // Bare-name reply (e.g. AI asked "شنو اسمك الثلاثي؟" and the customer typed just their name).
+  if (!merged.customer_name && merged.buy_committed && looksLikePlainName(inboundText)) {
+    merged.customer_name = String(inboundText).trim();
+  }
 
   merged.order_state = computeOrderState(merged);
   saveConversationOrderState(conversationId, merged);
@@ -410,6 +538,7 @@ function prepareOrderStateForPersist(conversationId, orderState, ctx = {}) {
       ...base,
       order_product_id: null,
       order_product_name: null,
+      order_product_ids: [],
       customer_phone: null,
       customer_name: null,
       customer_address: null,
@@ -426,12 +555,16 @@ function prepareOrderStateForPersist(conversationId, orderState, ctx = {}) {
     aiReply,
   ].join("\n");
 
-  Object.assign(merged, inferProductFromText(combinedText, products));
+  accumulateProducts(merged, inferProductsFromText(combinedText, products), products);
   if (!merged.order_product_id) {
-    Object.assign(merged, inferProductFromThread(history, products));
+    const threadPrimary = inferProductFromThread(history, products);
+    if (threadPrimary.order_product_id) {
+      accumulateProducts(merged, [threadPrimary], products);
+    }
   }
-  if (!merged.order_product_id) {
-    Object.assign(merged, inferProductFromText(aiReply, products));
+
+  if (!merged.customer_name && merged.buy_committed && looksLikePlainName(inboundText)) {
+    merged.customer_name = String(inboundText).trim();
   }
 
   if (
@@ -533,6 +666,9 @@ module.exports = {
   enrichOrderStateFromHistory,
   prepareOrderStateForPersist,
   inferProductFromText,
+  inferProductsFromText,
+  accumulateProducts,
+  looksLikePlainName,
   syncOrderStateAfterInbound,
   customerExplicitlyRequestsImages,
   customerRequestsHumanAgent,

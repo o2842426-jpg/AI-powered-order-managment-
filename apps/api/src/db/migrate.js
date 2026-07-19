@@ -369,6 +369,8 @@ function ensureChannelOrderStateColumns(db) {
     ["order_state", "TEXT NOT NULL DEFAULT 'AWAITING_PRODUCT'"],
     ["order_product_id", "INTEGER"],
     ["order_product_name", "TEXT"],
+    // JSON array of product IDs for multi-item orders (e.g. "[26,27]"). Primary/first mirrors order_product_id.
+    ["order_product_ids", "TEXT"],
     ["customer_city", "TEXT"],
     ["customer_phone", "TEXT"],
     ["customer_name", "TEXT"],

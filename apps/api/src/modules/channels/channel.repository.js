@@ -398,10 +398,30 @@ function listChannelMessagesForAi(conversationId, limit = 10) {
     .reverse();
 }
 
+/**
+ * Parse the JSON array stored in order_product_ids into a clean number[].
+ * @param {unknown} raw
+ * @returns {number[]}
+ */
+function parseProductIds(raw) {
+  if (Array.isArray(raw)) {
+    return [...new Set(raw.map(Number).filter((n) => Number.isFinite(n) && n > 0))];
+  }
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return [...new Set(arr.map(Number).filter((n) => Number.isFinite(n) && n > 0))];
+  } catch {
+    return [];
+  }
+}
+
 const DEFAULT_ORDER_STATE = {
   order_state: "AWAITING_PRODUCT",
   order_product_id: null,
   order_product_name: null,
+  order_product_ids: [],
   customer_city: null,
   customer_phone: null,
   customer_name: null,
@@ -423,6 +443,7 @@ function getConversationOrderState(conversationId) {
             order_state,
             order_product_id,
             order_product_name,
+            order_product_ids,
             customer_city,
             customer_phone,
             customer_name,
@@ -437,13 +458,14 @@ function getConversationOrderState(conversationId) {
       .get(conversationId) || null;
 
   if (!row) {
-    return { ...DEFAULT_ORDER_STATE };
+    return { ...DEFAULT_ORDER_STATE, order_product_ids: [] };
   }
 
   return {
     order_state: row.order_state || DEFAULT_ORDER_STATE.order_state,
     order_product_id: row.order_product_id ?? null,
     order_product_name: row.order_product_name ?? null,
+    order_product_ids: parseProductIds(row.order_product_ids),
     customer_city: row.customer_city ?? null,
     customer_phone: row.customer_phone ?? null,
     customer_name: row.customer_name ?? null,
@@ -473,6 +495,7 @@ function hardResetConversationOrderState(conversationId) {
         order_state = 'AWAITING_PRODUCT',
         order_product_id = NULL,
         order_product_name = NULL,
+        order_product_ids = NULL,
         customer_name = NULL,
         customer_phone = NULL,
         customer_city = NULL,
@@ -505,6 +528,7 @@ function saveConversationOrderState(conversationId, patch) {
         order_state = ?,
         order_product_id = ?,
         order_product_name = ?,
+        order_product_ids = ?,
         customer_city = ?,
         customer_phone = ?,
         customer_name = ?,
@@ -518,6 +542,7 @@ function saveConversationOrderState(conversationId, patch) {
     next.order_state || DEFAULT_ORDER_STATE.order_state,
     next.order_product_id ?? null,
     next.order_product_name ?? null,
+    JSON.stringify(parseProductIds(next.order_product_ids)),
     next.customer_city ?? null,
     next.customer_phone ?? null,
     next.customer_name ?? null,

@@ -61,7 +61,7 @@ function buildStrictExecutionRules(state) {
       break;
     case ORDER_STATES.CONFIRMED_AWAITING_FINALIZE:
       rules.push(
-        "لخّص: المنتج + السعر + العنوان + الهاتف + الدفع.",
+        "لخّص كل المنتجات المطلوبة (اذكرها كلها إن كانت أكثر من واحد) + السعر الإجمالي + العنوان + الهاتف + الدفع.",
         "قل إن الطلب تثبّت وسيتواصل فريق التوصيل.",
         "recommended_product_ids يجب أن تكون []."
       );
@@ -127,6 +127,11 @@ ${negotiationGuard}
  * @param {object} state
  */
 function buildDynamicOrderStateBlock(state) {
+  const productIds = Array.isArray(state.order_product_ids)
+    ? state.order_product_ids
+    : [];
+  const productLabel =
+    productIds.length > 1 ? "Target Products (multi-item)" : "Target Product";
   const productName = state.order_product_name || "غير محدد بعد";
   const city = state.customer_city
     ? `${state.customer_city} (SAVED! DO NOT ASK AGAIN)`
@@ -152,7 +157,7 @@ function buildDynamicOrderStateBlock(state) {
 # CURRENT ORDER STATE (authoritative — from database):
 - order_state: ${state.order_state || ORDER_STATES.AWAITING_PRODUCT}
 - buy_committed: ${Number(state.buy_committed) === 1 ? 1 : 0}
-- Target Product: ${productName}
+- ${productLabel}: ${productName}
 - Customer Name: ${customerName}
 - Customer Location: ${city}
 - Customer Phone: ${phone}

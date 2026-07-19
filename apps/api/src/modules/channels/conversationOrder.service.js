@@ -223,20 +223,35 @@ function createOrderFromConversationState({
     };
   }
 
-  const productId = Number(orderState.order_product_id);
-  const product = db
-    .prepare(
-      `
-        SELECT id, base_price, name
-        FROM products
-        WHERE id = ? AND store_id = ? AND is_active = 1
-      `
-    )
-    .get(productId, storeId);
+  const requestedIds = (
+    Array.isArray(orderState.order_product_ids) &&
+    orderState.order_product_ids.length
+      ? orderState.order_product_ids
+      : [orderState.order_product_id]
+  )
+    .map(Number)
+    .filter((id) => Number.isFinite(id) && id > 0);
+  const uniqueIds = [...new Set(requestedIds)];
 
-  if (!product) {
+  const orderProducts = uniqueIds
+    .map((id) =>
+      db
+        .prepare(
+          `
+            SELECT id, base_price, name
+            FROM products
+            WHERE id = ? AND store_id = ? AND is_active = 1
+          `
+        )
+        .get(id, storeId)
+    )
+    .filter(Boolean);
+
+  if (!orderProducts.length) {
     return { created: false, reason: "product_not_found" };
   }
+
+  const primaryProduct = orderProducts[0];
 
   const customerName = String(
     orderState.customer_name ||
@@ -300,18 +315,23 @@ function createOrderFromConversationState({
       .run(storeId, customerId, deliveryAddress, customerNote);
 
     const orderId = Number(orderIns.lastInsertRowid);
-    const unitPrice = Number(product.base_price);
-    const qty = 1;
-    const lineTotal = unitPrice * qty;
-
-    db.prepare(
+    const insertItem = db.prepare(
       `
         INSERT INTO order_items (order_id, product_id, variant_id, qty, unit_price, line_total)
         VALUES (?, ?, NULL, ?, ?, ?)
       `
-    ).run(orderId, productId, qty, unitPrice, lineTotal);
+    );
 
-    db.prepare(`UPDATE orders SET total_amount = ? WHERE id = ?`).run(lineTotal, orderId);
+    let orderTotal = 0;
+    const qty = 1;
+    for (const p of orderProducts) {
+      const unitPrice = Number(p.base_price);
+      const lineTotal = unitPrice * qty;
+      orderTotal += lineTotal;
+      insertItem.run(orderId, Number(p.id), qty, unitPrice, lineTotal);
+    }
+
+    db.prepare(`UPDATE orders SET total_amount = ? WHERE id = ?`).run(orderTotal, orderId);
 
     // Hard reset in the same transaction — canvas clear for the next order in this DM thread.
     hardResetConversationOrderState(conversationId);
@@ -319,13 +339,14 @@ function createOrderFromConversationState({
     return {
       order_id: orderId,
       customer_id: customerId,
-      total_amount: lineTotal,
-      product_name: product.name,
+      total_amount: orderTotal,
+      product_name: orderProducts.map((p) => p.name).join(" + "),
+      item_count: orderProducts.length,
     };
     })();
   } catch (err) {
     console.error(
-      `[channel-order] FAILED to persist order conversation=${conversationId} store=${storeId} product=${productId}: ${err?.message || err}`
+      `[channel-order] FAILED to persist order conversation=${conversationId} store=${storeId} products=[${uniqueIds.join(",")}]: ${err?.message || err}`
     );
     return {
       created: false,
@@ -335,7 +356,9 @@ function createOrderFromConversationState({
   }
 
   console.info(
-    `[channel-order] created order=${created.order_id} conversation=${conversationId} store=${storeId} product=${productId} total=${created.total_amount} — canvas hard-reset`
+    `[channel-order] created order=${created.order_id} conversation=${conversationId} store=${storeId} products=[${orderProducts
+      .map((p) => p.id)
+      .join(",")}] items=${created.item_count} total=${created.total_amount} — canvas hard-reset`
   );
 
   return { created: true, ...created };
