@@ -22,6 +22,7 @@ import { OwnerLoginPage } from "./pages/OwnerLoginPage";
 import { OwnerOrdersPage } from "./pages/OwnerOrdersPage";
 import { CreateStorePage } from "./pages/CreateStorePage";
 import { StorefrontPage } from "./pages/StorefrontPage";
+import { LandingPage } from "./pages/LandingPage";
 import { OwnerConversationsPage } from "./pages/OwnerConversationsPage";
 import { SuperAdminLoginPage } from "./pages/SuperAdminLoginPage";
 import { SuperAdminPage } from "./pages/SuperAdminPage";
@@ -485,6 +486,12 @@ function App() {
           ) : null}
           {renderOwnerMain()}
         </OwnerShell>
+      ) : view === "landing" ? (
+        <LandingPage
+          onStartTrial={() => setView("create-store")}
+          onLogin={() => setView("owner-login")}
+          onViewStore={() => setView("store")}
+        />
       ) : (
         <main className="page page--public">
           {publicNav}

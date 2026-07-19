@@ -38,7 +38,8 @@ export function computeInitialView() {
 
   if (!auth) {
     if (o === "upgrade") return "owner-login";
-    return "store";
+    if (params.get("store") || params.get("slug")) return "store";
+    return "landing";
   }
   if (o && OWNER_URL_SYNC_VIEWS.has(o)) return o;
   return "dashboard";
