@@ -1,6 +1,10 @@
 const OpenAI = require("openai");
 const { listSalesExamplesForStore } = require("../salesTraining/salesExamples.repository");
 const { buildSalesTrainingBlock } = require("../salesTraining/salesTrainingPrompt");
+const { buildClothingStorePromptBlock } = require("./clothingStorePrompt");
+const { shouldEnforcePlansForStore } = require("../billing/billing.demoOverride");
+const { getStorePlanContext } = require("../plans/planEntitlements");
+const { tierMeetsFeature } = require("../plans/planMatrix");
 
 const FALLBACK_REPLY = "تم استلام رسالتك، وسيتم الرد قريبًا.";
 const MAX_HISTORY_MESSAGES = 10;
@@ -575,6 +579,19 @@ async function generateStoreChatReply({
   const checkoutBlock =
     phase === "checkout" ? buildCheckoutProtocolBlock(checkoutContext) : "";
   const dynamicStateBlock = String(orderStateBlock || "").trim();
+
+  // Growth/Pro: Clothing & Apparel Sales Engine (additive — FSM order state still wins).
+  let clothingVerticalBlock = "";
+  const storeId = Number(store?.id);
+  if (Number.isFinite(storeId) && storeId > 0) {
+    const enforcePlans = shouldEnforcePlansForStore(storeId);
+    const { tier } = getStorePlanContext(storeId);
+    const allowClothing =
+      !enforcePlans || tierMeetsFeature(tier, "clothing_sales_engine");
+    if (allowClothing) {
+      clothingVerticalBlock = buildClothingStorePromptBlock(store);
+    }
+  }
   const resolvedSalesExamples = Array.isArray(salesExamples)
     ? salesExamples
     : Number(store?.id) > 0
@@ -671,7 +688,7 @@ ${jsonInstructions}
 
 ${salesPersona}
 
-${dynamicStateBlock ? `${dynamicStateBlock}\n\n` : ""}${objectionBlock ? `${objectionBlock}\n\n` : ""}${checkoutBlock ? `${checkoutBlock}\n\n` : ""}${salesPlaybook}${trainingBlock ? `\n\n${trainingBlock}` : ""}
+${clothingVerticalBlock ? `${clothingVerticalBlock}\n\n` : ""}${dynamicStateBlock ? `${dynamicStateBlock}\n\n` : ""}${objectionBlock ? `${objectionBlock}\n\n` : ""}${checkoutBlock ? `${checkoutBlock}\n\n` : ""}${salesPlaybook}${trainingBlock ? `\n\n${trainingBlock}` : ""}
 
 تعليمات صاحب المتجر (ما لم تخالف الكتالوج أو قواعد الإغلاق):
 ${ownerPrompt}${channelBlock ? `\n\n${channelBlock}` : ""}${memoryBlock}${followupsBlock}`,

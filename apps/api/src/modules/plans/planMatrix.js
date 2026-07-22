@@ -33,6 +33,8 @@ const FEATURE_MIN_TIER = {
   smart_product_suggestions: "growth",
   ai_personality_customization: "growth",
   customer_activity_tracking: "growth",
+  /** Apparel vertical: Aura clothing sales engine (FSM + sizing + objection matrix). */
+  clothing_sales_engine: "growth",
   ai_followups: "pro",
   followup_tasks: "pro",
   lead_scoring: "pro",
