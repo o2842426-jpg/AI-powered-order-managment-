@@ -36,6 +36,7 @@ const {
   setChannelConversationTakeover,
   postChannelOwnerMessage,
 } = require("../channels/channel.conversations.controller");
+const { postManagerAiChat } = require("../managerAi/managerAi.controller");
 
 const storesRouter = express.Router();
 
@@ -138,5 +139,11 @@ storesRouter.get("/:storeId/summary", getStoreSummary);
 storesRouter.get("/:storeId/low-stock", getStoreLowStock);
 storesRouter.get("/:storeId/settings", getStoreSettings);
 storesRouter.patch("/:storeId/settings", updateStoreSettings);
+
+storesRouter.post(
+  "/:storeId/manager-ai/chat",
+  requirePlanFeature("owner_manager_ai"),
+  postManagerAiChat
+);
 
 module.exports = { storesRouter };

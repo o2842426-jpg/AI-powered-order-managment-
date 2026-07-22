@@ -44,6 +44,8 @@ const FEATURE_MIN_TIER = {
   priority_ai_processing: "pro",
   unlimited_ai_messages: "pro",
   advanced_automations: "pro",
+  /** Owner dashboard copilot: product help + live store ops (read-only). */
+  owner_manager_ai: "pro",
 };
 
 function tierRank(tier) {

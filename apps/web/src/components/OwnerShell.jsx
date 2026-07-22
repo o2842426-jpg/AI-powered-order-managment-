@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { BrandMark } from "./BrandMark";
+import { ManagerAiWidget } from "./ManagerAiWidget";
 import "./OwnerShell.css";
 
 const NAV_ITEMS = [
@@ -246,6 +247,11 @@ export function OwnerShell({
 
         <div className="owner-shell__content">{children}</div>
       </div>
+
+      <ManagerAiWidget
+        billingStatus={billingStatus}
+        onUpgrade={() => onNavigate?.("upgrade")}
+      />
     </div>
   );
 }

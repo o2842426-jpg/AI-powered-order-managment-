@@ -26,6 +26,10 @@ const PLAN_FEATURE_MESSAGES = {
     "This feature requires Pro. Upgrade your plan to use AI lead scoring.",
   advanced_analytics:
     "This feature requires Growth or Pro. Upgrade your plan for advanced analytics insights.",
+  owner_manager_ai:
+    "هذه الميزة متوفرة في باقة Pro فقط. ارفع باقتك لاستخدام مساعد المدير داخل لوحة التحكم.",
+  clothing_sales_engine:
+    "This feature requires Growth or Pro. Upgrade your plan for the clothing sales AI engine.",
 };
 
 /**
