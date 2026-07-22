@@ -2,6 +2,10 @@ const OpenAI = require("openai");
 const { listSalesExamplesForStore } = require("../salesTraining/salesExamples.repository");
 const { buildSalesTrainingBlock } = require("../salesTraining/salesTrainingPrompt");
 const { buildClothingStorePromptBlock } = require("./clothingStorePrompt");
+const {
+  buildStoreOnboardingPromptBlock,
+  normalizeStoreVertical,
+} = require("../stores/storeOnboarding.constants");
 const { shouldEnforcePlansForStore } = require("../billing/billing.demoOverride");
 const { getStorePlanContext } = require("../plans/planEntitlements");
 const { tierMeetsFeature } = require("../plans/planMatrix");
@@ -580,10 +584,12 @@ async function generateStoreChatReply({
     phase === "checkout" ? buildCheckoutProtocolBlock(checkoutContext) : "";
   const dynamicStateBlock = String(orderStateBlock || "").trim();
 
-  // Growth/Pro: Clothing & Apparel Sales Engine (additive — FSM order state still wins).
+  // Clothing engine only when owner chose apparel vertical + Growth/Pro (when plans enforced).
   let clothingVerticalBlock = "";
   const storeId = Number(store?.id);
-  if (Number.isFinite(storeId) && storeId > 0) {
+  const isClothingVertical =
+    normalizeStoreVertical(store?.store_vertical) === "clothing";
+  if (isClothingVertical && Number.isFinite(storeId) && storeId > 0) {
     const enforcePlans = shouldEnforcePlansForStore(storeId);
     const { tier } = getStorePlanContext(storeId);
     const allowClothing =
@@ -592,6 +598,7 @@ async function generateStoreChatReply({
       clothingVerticalBlock = buildClothingStorePromptBlock(store);
     }
   }
+  const onboardingBlock = buildStoreOnboardingPromptBlock(store);
   const resolvedSalesExamples = Array.isArray(salesExamples)
     ? salesExamples
     : Number(store?.id) > 0
@@ -688,7 +695,7 @@ ${jsonInstructions}
 
 ${salesPersona}
 
-${clothingVerticalBlock ? `${clothingVerticalBlock}\n\n` : ""}${dynamicStateBlock ? `${dynamicStateBlock}\n\n` : ""}${objectionBlock ? `${objectionBlock}\n\n` : ""}${checkoutBlock ? `${checkoutBlock}\n\n` : ""}${salesPlaybook}${trainingBlock ? `\n\n${trainingBlock}` : ""}
+${onboardingBlock ? `${onboardingBlock}\n\n` : ""}${clothingVerticalBlock ? `${clothingVerticalBlock}\n\n` : ""}${dynamicStateBlock ? `${dynamicStateBlock}\n\n` : ""}${objectionBlock ? `${objectionBlock}\n\n` : ""}${checkoutBlock ? `${checkoutBlock}\n\n` : ""}${salesPlaybook}${trainingBlock ? `\n\n${trainingBlock}` : ""}
 
 تعليمات صاحب المتجر (ما لم تخالف الكتالوج أو قواعد الإغلاق):
 ${ownerPrompt}${channelBlock ? `\n\n${channelBlock}` : ""}${memoryBlock}${followupsBlock}`,

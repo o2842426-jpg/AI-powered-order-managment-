@@ -9,6 +9,11 @@ import { authFetch, getOwnerStoreIdFromAuth } from "../lib/auth";
 import { throwIfNotOk, userErrorMessage } from "../lib/apiErrors";
 import { buildPublicStorefrontUrl } from "../lib/storefrontUrl";
 import { formatProductOptionSummary } from "../lib/productOptions";
+import {
+  DEFAULT_PAYMENT_OPTIONS,
+  REPLY_DIALECT_OPTIONS,
+  STORE_VERTICAL_OPTIONS,
+} from "../lib/storeOnboarding";
 import { OwnerMetricCard } from "../components/OwnerMetricCard";
 import "./OwnerDashboardPage.css";
 
@@ -1849,6 +1854,77 @@ export function OwnerDashboardPage({
                   value={settings.phone || ""}
                   onChange={(event) =>
                     setSettings({ ...settings, phone: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                نوع المتجر
+                <select
+                  value={settings.store_vertical || ""}
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      store_vertical: event.target.value || null,
+                    })
+                  }
+                >
+                  <option value="">غير محدد</option>
+                  {STORE_VERTICAL_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                لهجة الرد مع العملاء
+                <select
+                  value={settings.reply_dialect || ""}
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      reply_dialect: event.target.value || null,
+                    })
+                  }
+                >
+                  <option value="">غير محدد</option>
+                  {REPLY_DIALECT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                طريقة الدفع الافتراضية
+                <select
+                  value={settings.default_payment || ""}
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      default_payment: event.target.value || null,
+                    })
+                  }
+                >
+                  <option value="">غير محدد</option>
+                  {DEFAULT_PAYMENT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                ماذا تبيع؟ (جملة قصيرة)
+                <input
+                  value={settings.sell_summary || ""}
+                  maxLength={280}
+                  placeholder="مثال: جاكيتات وشنط نسائية"
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      sell_summary: event.target.value,
+                    })
                   }
                 />
               </label>

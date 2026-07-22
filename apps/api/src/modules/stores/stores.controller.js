@@ -3,6 +3,11 @@ const { computeStoreAnalytics } = require("../analytics/storeAnalytics.service")
 const { assertStoreScope } = require("./storeScope");
 const { storeHasFeature } = require("../plans/planEntitlements");
 const { getOrderStatusCountsForStore } = require("../orders/orders.statusCounts.service");
+const {
+  normalizeStoreVertical,
+  normalizeReplyDialect,
+  normalizeDefaultPayment,
+} = require("./storeOnboarding.constants");
 
 const STORE_CURRENCY_CODES = new Set(["SAR", "IQD", "USD"]);
 
@@ -13,32 +18,34 @@ function normalizeStoreCurrencyCodeInput(raw) {
   return STORE_CURRENCY_CODES.has(c) ? c : "SAR";
 }
 
+const SETTINGS_SELECT = `
+  SELECT
+    id,
+    name,
+    slug,
+    phone,
+    delivery_info,
+    ai_prompt,
+    logo_url,
+    theme_color,
+    accent_color,
+    policy_text,
+    currency_code,
+    store_vertical,
+    reply_dialect,
+    default_payment,
+    sell_summary,
+    created_at
+  FROM stores
+  WHERE id = ?
+`;
+
 function getStoreSettings(req, res) {
   try {
     const storeId = Number(req.params.storeId);
     if (!assertStoreScope(req, res, storeId)) return;
 
-    const store = db
-      .prepare(
-        `
-          SELECT
-            id,
-            name,
-            slug,
-            phone,
-            delivery_info,
-            ai_prompt,
-            logo_url,
-            theme_color,
-            accent_color,
-            policy_text,
-            currency_code,
-            created_at
-          FROM stores
-          WHERE id = ?
-        `
-      )
-      .get(storeId);
+    const store = db.prepare(SETTINGS_SELECT).get(storeId);
 
     if (!store) {
       return res.status(404).json({ message: "Store not found." });
@@ -68,10 +75,20 @@ function updateStoreSettings(req, res) {
       accent_color,
       policy_text,
       currency_code,
+      store_vertical,
+      reply_dialect,
+      default_payment,
+      sell_summary,
     } = req.body;
 
     const existingStore = db
-      .prepare("SELECT id, currency_code FROM stores WHERE id = ?")
+      .prepare(
+        `
+          SELECT id, currency_code, store_vertical, reply_dialect, default_payment, sell_summary
+          FROM stores
+          WHERE id = ?
+        `
+      )
       .get(storeId);
 
     if (!existingStore) {
@@ -87,6 +104,40 @@ function updateStoreSettings(req, res) {
       return res.status(400).json({ message: "name is required." });
     }
 
+    let nextVertical = existingStore.store_vertical;
+    if (store_vertical !== undefined) {
+      const normalized = normalizeStoreVertical(store_vertical);
+      if (store_vertical && !normalized) {
+        return res.status(400).json({ message: "Invalid store_vertical." });
+      }
+      nextVertical = normalized;
+    }
+
+    let nextDialect = existingStore.reply_dialect;
+    if (reply_dialect !== undefined) {
+      const normalized = normalizeReplyDialect(reply_dialect);
+      if (reply_dialect && !normalized) {
+        return res.status(400).json({ message: "Invalid reply_dialect." });
+      }
+      nextDialect = normalized;
+    }
+
+    let nextPayment = existingStore.default_payment;
+    if (default_payment !== undefined) {
+      const normalized = normalizeDefaultPayment(default_payment);
+      if (default_payment && !normalized) {
+        return res.status(400).json({ message: "Invalid default_payment." });
+      }
+      nextPayment = normalized;
+    }
+
+    const nextSell =
+      sell_summary !== undefined
+        ? sell_summary
+          ? String(sell_summary).trim().slice(0, 280)
+          : null
+        : existingStore.sell_summary;
+
     db.prepare(
       `
         UPDATE stores
@@ -99,7 +150,11 @@ function updateStoreSettings(req, res) {
           theme_color = ?,
           accent_color = ?,
           policy_text = ?,
-          currency_code = ?
+          currency_code = ?,
+          store_vertical = ?,
+          reply_dialect = ?,
+          default_payment = ?,
+          sell_summary = ?
         WHERE id = ?
       `
     ).run(
@@ -112,30 +167,14 @@ function updateStoreSettings(req, res) {
       accent_color ? String(accent_color).trim() : null,
       policy_text ? String(policy_text).trim() : null,
       mergedCurrency,
+      nextVertical,
+      nextDialect,
+      nextPayment,
+      nextSell,
       storeId
     );
 
-    const updatedStore = db
-      .prepare(
-        `
-          SELECT
-            id,
-            name,
-            slug,
-            phone,
-            delivery_info,
-            ai_prompt,
-            logo_url,
-            theme_color,
-            accent_color,
-            policy_text,
-            currency_code,
-            created_at
-          FROM stores
-          WHERE id = ?
-        `
-      )
-      .get(storeId);
+    const updatedStore = db.prepare(SETTINGS_SELECT).get(storeId);
 
     return res.status(200).json({ data: updatedStore });
   } catch (error) {

@@ -3,6 +3,12 @@ import { apiUrl } from "../lib/api";
 import { rememberPublicStoreSlug } from "../lib/publicStoreSlug";
 import { storeAuth } from "../lib/auth";
 import { throwIfNotOk, userErrorMessage, withNetworkError } from "../lib/apiErrors";
+import {
+  DEFAULT_PAYMENT_OPTIONS,
+  REPLY_DIALECT_OPTIONS,
+  STORE_CURRENCY_OPTIONS,
+  STORE_VERTICAL_OPTIONS,
+} from "../lib/storeOnboarding";
 import { BrandMark } from "../components/BrandMark";
 import "./CreateStorePage.css";
 
@@ -21,7 +27,13 @@ export function CreateStorePage({ onDone, onBackToLogin }) {
   const [storeName, setStoreName] = useState("");
   const [slug, setSlug] = useState("");
   const [phone, setPhone] = useState("");
+  const [storeVertical, setStoreVertical] = useState("clothing");
+  const [replyDialect, setReplyDialect] = useState("iraqi");
+  const [currencyCode, setCurrencyCode] = useState("IQD");
+  const [defaultPayment, setDefaultPayment] = useState("cod");
+  const [sellSummary, setSellSummary] = useState("");
   const [deliveryInfo, setDeliveryInfo] = useState("");
+  const [policyText, setPolicyText] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,6 +51,10 @@ export function CreateStorePage({ onDone, onBackToLogin }) {
       setError("كلمتا المرور غير متطابقتين.");
       return;
     }
+    if (!storeVertical) {
+      setError("اختر نوع المتجر.");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -50,7 +66,13 @@ export function CreateStorePage({ onDone, onBackToLogin }) {
             store_name: storeName.trim(),
             slug: slug.trim() || undefined,
             phone: phone.trim() || undefined,
+            store_vertical: storeVertical,
+            reply_dialect: replyDialect,
+            currency_code: currencyCode,
+            default_payment: defaultPayment,
+            sell_summary: sellSummary.trim() || undefined,
             delivery_info: deliveryInfo.trim() || undefined,
+            policy_text: policyText.trim() || undefined,
             owner_name: ownerName.trim(),
             email: email.trim(),
             password,
@@ -87,9 +109,8 @@ export function CreateStorePage({ onDone, onBackToLogin }) {
         <p className="create-store__eyebrow">بداية جديدة</p>
         <h1>أنشئ متجرك</h1>
         <p className="create-store__lead">
-          بعد النجاح يُحفظ معرّف الرابط في المتصفح ليُحمَّل متجرك هنا مباشرة. يمكنك أيضًا
-          إرسال رابط للزوار يتضمن <code>?store=معرّف-المتجر</code>، أو ضبط{" "}
-          <code>VITE_STORE_SLUG</code> عند بناء الموقع للنشر العام.
+          نجهّز مساعد المبيعات حسب نوع متجرك ولهجتك. بعد الإنشاء يمكنك تعديل كل شيء من
+          الإعدادات.
         </p>
 
         <form onSubmit={submit}>
@@ -126,12 +147,95 @@ export function CreateStorePage({ onDone, onBackToLogin }) {
             />
           </label>
 
+          <p className="create-store__section">إعداد المساعد والمتجر</p>
+
+          <label>
+            نوع المتجر
+            <select
+              value={storeVertical}
+              onChange={(e) => setStoreVertical(e.target.value)}
+              required
+            >
+              {STORE_VERTICAL_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            لهجة الرد مع العملاء
+            <select
+              value={replyDialect}
+              onChange={(e) => setReplyDialect(e.target.value)}
+              required
+            >
+              {REPLY_DIALECT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            العملة
+            <select
+              value={currencyCode}
+              onChange={(e) => setCurrencyCode(e.target.value)}
+              required
+            >
+              {STORE_CURRENCY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            طريقة الدفع الافتراضية
+            <select
+              value={defaultPayment}
+              onChange={(e) => setDefaultPayment(e.target.value)}
+              required
+            >
+              {DEFAULT_PAYMENT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            ماذا تبيع؟ (جملة قصيرة)
+            <input
+              value={sellSummary}
+              onChange={(e) => setSellSummary(e.target.value)}
+              placeholder="مثال: جاكيتات وشنط نسائية"
+              maxLength={280}
+            />
+          </label>
+
           <label>
             معلومات التوصيل (اختياري)
             <textarea
               value={deliveryInfo}
               onChange={(e) => setDeliveryInfo(e.target.value)}
               rows={2}
+              placeholder="مثال: توصيل لكل المحافظات خلال 2–4 أيام"
+            />
+          </label>
+
+          <label>
+            سياسة الاستبدال / الإرجاع (اختياري)
+            <textarea
+              value={policyText}
+              onChange={(e) => setPolicyText(e.target.value)}
+              rows={2}
+              placeholder="مثال: استبدال المقاس خلال 3 أيام"
             />
           </label>
 

@@ -10,6 +10,7 @@ function migrate(db) {
   db.exec(schemaSql);
   ensureStoreSettingsColumns(db);
   ensureStoreCurrencyColumn(db);
+  ensureStoreOnboardingColumns(db);
   ensureStorePlanUsageColumns(db);
   ensureStoreSubscriptionColumns(db);
   ensureProductImageColumns(db);
@@ -60,6 +61,23 @@ function ensureStoreCurrencyColumn(db) {
   db.prepare(
     "UPDATE stores SET currency_code = 'SAR' WHERE currency_code IS NULL OR TRIM(currency_code) = ''"
   ).run();
+}
+
+/** Onboarding profile: vertical, dialect, payment default, sell blurb. */
+function ensureStoreOnboardingColumns(db) {
+  const columns = db.prepare("PRAGMA table_info(stores)").all();
+  const names = new Set(columns.map((c) => c.name));
+  const additions = [
+    ["store_vertical", "TEXT"],
+    ["reply_dialect", "TEXT"],
+    ["default_payment", "TEXT"],
+    ["sell_summary", "TEXT"],
+  ];
+  for (const [name, ddl] of additions) {
+    if (!names.has(name)) {
+      db.exec(`ALTER TABLE stores ADD COLUMN ${name} ${ddl}`);
+    }
+  }
 }
 
 function ensureStorePlanUsageColumns(db) {

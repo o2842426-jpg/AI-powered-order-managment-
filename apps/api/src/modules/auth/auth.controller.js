@@ -1,6 +1,21 @@
 const crypto = require("crypto");
 const { db } = require("../../db/client");
 const { TRIAL_DAYS } = require("../billing/billing.access");
+const {
+  normalizeStoreVertical,
+  normalizeReplyDialect,
+  normalizeDefaultPayment,
+  buildSeedAiPrompt,
+} = require("../stores/storeOnboarding.constants");
+
+const STORE_CURRENCY_CODES = new Set(["SAR", "IQD", "USD"]);
+
+function normalizeCreateCurrency(raw) {
+  const c = String(raw ?? "IQD")
+    .trim()
+    .toUpperCase();
+  return STORE_CURRENCY_CODES.has(c) ? c : "IQD";
+}
 
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
 
@@ -188,6 +203,12 @@ function createStoreWithOwner(req, res) {
       slug: slugInput,
       phone,
       delivery_info,
+      policy_text,
+      currency_code,
+      store_vertical,
+      reply_dialect,
+      default_payment,
+      sell_summary,
       owner_name,
       email,
       password,
@@ -263,6 +284,26 @@ function createStoreWithOwner(req, res) {
       delivery_info != null && String(delivery_info).trim()
         ? String(delivery_info).trim()
         : null;
+    const policy =
+      policy_text != null && String(policy_text).trim()
+        ? String(policy_text).trim()
+        : null;
+
+    const vertical = normalizeStoreVertical(store_vertical);
+    if (!vertical) {
+      return res.status(400).json({
+        message: "store_vertical is required (clothing, electronics, beauty, home, real_estate, food, other).",
+      });
+    }
+
+    const dialect = normalizeReplyDialect(reply_dialect) || "iraqi";
+    const payment = normalizeDefaultPayment(default_payment) || "cod";
+    const sellSummary =
+      sell_summary != null && String(sell_summary).trim()
+        ? String(sell_summary).trim().slice(0, 280)
+        : null;
+    const currency = normalizeCreateCurrency(currency_code);
+    const seededPrompt = buildSeedAiPrompt(sellSummary, vertical);
 
     let newUserId;
 
@@ -276,13 +317,29 @@ function createStoreWithOwner(req, res) {
         .prepare(
           `
             INSERT INTO stores (
-              name, slug, phone, delivery_info,
+              name, slug, phone, delivery_info, policy_text,
+              currency_code, store_vertical, reply_dialect, default_payment,
+              sell_summary, ai_prompt,
               subscription_status, trial_started_at, trial_ends_at
             )
-            VALUES (?, ?, ?, ?, 'trial', ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'trial', ?, ?)
           `
         )
-        .run(name, slug, phoneStr || null, delivery, trialStartedAt, trialEndsAt);
+        .run(
+          name,
+          slug,
+          phoneStr || null,
+          delivery,
+          policy,
+          currency,
+          vertical,
+          dialect,
+          payment,
+          sellSummary,
+          seededPrompt,
+          trialStartedAt,
+          trialEndsAt
+        );
 
       const storeId = Number(storeResult.lastInsertRowid);
       const userResult = db

@@ -68,11 +68,21 @@
 }
 
 .create-store input,
-.create-store textarea {
+.create-store textarea,
+.create-store select {
   padding: 0.58rem 0.7rem;
   border: 1px solid #d1d5db;
   border-radius: 9px;
   font: inherit;
+  background: #fff;
+}
+
+.create-store__section {
+  margin: 0.35rem 0 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #4f46e5;
+  letter-spacing: 0.02em;
 }
 
 .create-store textarea {
