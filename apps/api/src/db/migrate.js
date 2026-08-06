@@ -27,6 +27,8 @@ function migrate(db) {
   ensureProductImagesTable(db);
   ensureSalesExamplesTable(db);
   ensureOrderHiddenColumn(db);
+  ensureProductSizeChartColumn(db);
+  ensureChannelApparelColumns(db);
 }
 
 function ensureStoreSettingsColumns(db) {
@@ -420,6 +422,30 @@ function ensureOrderHiddenColumn(db) {
   db.exec(
     "CREATE INDEX IF NOT EXISTS idx_orders_store_visible ON orders(store_id, is_hidden, id DESC)"
   );
+}
+
+function ensureProductSizeChartColumn(db) {
+  const columns = db.prepare("PRAGMA table_info(products)").all();
+  const names = new Set(columns.map((c) => c.name));
+  if (!names.has("size_chart_url")) {
+    db.exec("ALTER TABLE products ADD COLUMN size_chart_url TEXT");
+  }
+}
+
+/** Apparel checkout: selected variant + size/color on DM conversation state. */
+function ensureChannelApparelColumns(db) {
+  const columns = db.prepare("PRAGMA table_info(channel_conversations)").all();
+  const names = new Set(columns.map((c) => c.name));
+  const additions = [
+    ["order_variant_id", "INTEGER"],
+    ["selected_size", "TEXT"],
+    ["selected_color", "TEXT"],
+  ];
+  for (const [name, ddl] of additions) {
+    if (!names.has(name)) {
+      db.exec(`ALTER TABLE channel_conversations ADD COLUMN ${name} ${ddl}`);
+    }
+  }
 }
 
 function ensureSalesExamplesTable(db) {

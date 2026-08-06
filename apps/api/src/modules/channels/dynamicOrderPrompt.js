@@ -14,6 +14,10 @@ function getCurrentGoalString(state) {
   switch (state.order_state) {
     case ORDER_STATES.AWAITING_PRODUCT:
       return "فهم المنتج المطلوب وعرضه مرة واحدة مع السعر";
+    case ORDER_STATES.AWAITING_SIZE:
+      return "تأكيد المقاس المناسب — اعرض المقاسات المتوفرة فقط";
+    case ORDER_STATES.AWAITING_COLOR:
+      return "تأكيد اللون — اعرض الألوان المتوفرة فقط";
     case ORDER_STATES.AWAITING_LOCATION:
       return "جمع المحافظة والعنوان التفصيلي فقط — بدون إعادة عرض المنتج";
     case ORDER_STATES.AWAITING_PHONE:
@@ -43,6 +47,19 @@ function buildStrictExecutionRules(state) {
       rules.push(
         "اعرض منتجاً واحداً مع السعر؛ صور المنتج مرة واحدة فقط إن لزم.",
         "اختم بسؤال CTA بخيارين للانتقال للشراء."
+      );
+      break;
+    case ORDER_STATES.AWAITING_SIZE:
+      rules.push(
+        "اسأل عن المقاس فقط — اعرض المقاسات المتوفرة من المخزون.",
+        "إذا وُجد رابط جدول المقاسات (size_chart_url) في قائمة المنتجات، اذكر أنك تقدر ترسل جدول المقاسات.",
+        "ممنوع طلب العنوان أو الهاتف قبل تحديد المقاس."
+      );
+      break;
+    case ORDER_STATES.AWAITING_COLOR:
+      rules.push(
+        "اسأل عن اللون فقط — اعرض الألوان المتوفرة للمقاس المختار.",
+        "ممنوع طلب العنوان أو الهاتف قبل تحديد اللون."
       );
       break;
     case ORDER_STATES.AWAITING_LOCATION:
@@ -149,6 +166,16 @@ function buildDynamicOrderStateBlock(state) {
       ? "كاش عند الاستلام (SAVED)"
       : "MISSING";
 
+  const size = state.selected_size
+    ? `${state.selected_size} (SAVED! DO NOT ASK AGAIN)`
+    : "MISSING";
+  const color = state.selected_color
+    ? `${state.selected_color} (SAVED! DO NOT ASK AGAIN)`
+    : "MISSING";
+  const variantId = state.order_variant_id
+    ? `${state.order_variant_id} (SAVED)`
+    : "MISSING";
+
   const goal = getCurrentGoalString(state);
   const strict = buildStrictExecutionRules(state);
   const conditionalRules = buildConditionalPhaseRules(state);
@@ -158,6 +185,9 @@ function buildDynamicOrderStateBlock(state) {
 - order_state: ${state.order_state || ORDER_STATES.AWAITING_PRODUCT}
 - buy_committed: ${Number(state.buy_committed) === 1 ? 1 : 0}
 - ${productLabel}: ${productName}
+- Selected Size: ${size}
+- Selected Color: ${color}
+- Variant ID: ${variantId}
 - Customer Name: ${customerName}
 - Customer Location: ${city}
 - Customer Phone: ${phone}

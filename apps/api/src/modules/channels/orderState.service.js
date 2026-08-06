@@ -3,6 +3,13 @@ const {
   saveConversationOrderState,
 } = require("./channel.repository");
 const { ORDER_STATES, IRAQI_GOVERNORATES } = require("./orderState.constants");
+const {
+  isClothingStore,
+  productHasActiveVariants,
+  listVariantOptions,
+  extractSizeColorFromText,
+  resolveVariantForProduct,
+} = require("../clothing/clothing.service");
 
 const BUY_SIGNALS =
   /اشتري|أريد\s*اشتري|اريد\s*اشتري|أريد\s*أطلب|اريد\s*أطلب|أريد\s*اطلب|اريد\s*اطلب|ابي\s*اشتري|أبي\s*اشتري|ابي\s*اطلب|أبي\s*اطلب|(?:^|[\s،,])(?:أطلب|اطلب)(?:[\s،,]|$)|ثبت|ثبتلي|ثبّت|احجز|كمل|كمّل|كمل\s*الطلب|رتب|اي\s*ثبت|أي\s*ثبت|ابشر\s*ثبت|اوكي\s*اشتري|تمام\s*اشتري|طلب\s*جديد/i;
@@ -349,7 +356,28 @@ function normalizeCity(raw) {
 /**
  * @param {object} row
  */
-function computeOrderState(row) {
+/**
+ * @param {number} productId
+ */
+function productVariantsNeedSize(productId) {
+  const variants = listVariantOptions(productId).filter((v) => Number(v.stock_qty) > 0);
+  return variants.some((v) => String(v.size || "").trim());
+}
+
+/**
+ * @param {number} productId
+ */
+function productVariantsNeedColor(productId) {
+  const variants = listVariantOptions(productId).filter((v) => Number(v.stock_qty) > 0);
+  return variants.some((v) => String(v.color || "").trim());
+}
+
+/**
+ * @param {object} row
+ * @param {{ storeId?: number }} [options]
+ */
+function computeOrderState(row, options = {}) {
+  const storeId = options.storeId != null ? Number(options.storeId) : null;
   const hasProduct = Boolean(row.order_product_id || row.order_product_name);
   const hasLocation = Boolean(row.customer_city || row.customer_address);
   const hasPhone = Boolean(row.customer_phone);
@@ -358,6 +386,33 @@ function computeOrderState(row) {
   if (!hasProduct || !buyCommitted) {
     return ORDER_STATES.AWAITING_PRODUCT;
   }
+
+  if (
+    storeId &&
+    isClothingStore(storeId) &&
+    row.order_product_id &&
+    productHasActiveVariants(row.order_product_id)
+  ) {
+    const pid = Number(row.order_product_id);
+    if (productVariantsNeedSize(pid) && !row.selected_size) {
+      return ORDER_STATES.AWAITING_SIZE;
+    }
+    if (productVariantsNeedColor(pid) && !row.selected_color) {
+      return ORDER_STATES.AWAITING_COLOR;
+    }
+    if (!row.order_variant_id) {
+      const resolved = resolveVariantForProduct(pid, {
+        size: row.selected_size,
+        color: row.selected_color,
+      });
+      if (!resolved) {
+        return productVariantsNeedSize(pid) && !row.selected_size
+          ? ORDER_STATES.AWAITING_SIZE
+          : ORDER_STATES.AWAITING_COLOR;
+      }
+    }
+  }
+
   if (!hasLocation) {
     return ORDER_STATES.AWAITING_LOCATION;
   }
@@ -365,6 +420,20 @@ function computeOrderState(row) {
     return ORDER_STATES.AWAITING_PHONE;
   }
   return ORDER_STATES.CONFIRMED_AWAITING_FINALIZE;
+}
+
+/**
+ * Apply apparel size/color from inbound text for clothing stores.
+ * @param {object} merged
+ * @param {string} text
+ * @param {number} storeId
+ */
+function applyApparelFieldsFromText(merged, text, storeId) {
+  if (!storeId || !isClothingStore(storeId) || !merged.order_product_id) {
+    return merged;
+  }
+  const patch = extractSizeColorFromText(text, Number(merged.order_product_id));
+  return { ...merged, ...patch };
 }
 
 /**
@@ -462,8 +531,10 @@ function enrichOrderStateFromHistory(row, history, products = []) {
  * @param {string} inboundText
  * @param {object[]} history
  * @param {object[]} products
+ * @param {{ storeId?: number }} [options]
  */
-function syncOrderStateAfterInbound(conversationId, inboundText, history, products) {
+function syncOrderStateAfterInbound(conversationId, inboundText, history, products, options = {}) {
+  const storeId = options.storeId != null ? Number(options.storeId) : null;
   const current = getConversationOrderState(conversationId);
   let base = { ...current };
 
@@ -473,6 +544,9 @@ function syncOrderStateAfterInbound(conversationId, inboundText, history, produc
       order_product_id: null,
       order_product_name: null,
       order_product_ids: [],
+      order_variant_id: null,
+      selected_size: null,
+      selected_color: null,
       customer_phone: null,
       customer_name: null,
       customer_address: null,
@@ -510,6 +584,8 @@ function syncOrderStateAfterInbound(conversationId, inboundText, history, produc
     ...patch,
   };
 
+  merged = applyApparelFieldsFromText(merged, inboundText, storeId);
+
   delete merged.buy_confirmed;
 
   // Bare-name reply (e.g. AI asked "شنو اسمك الثلاثي؟" and the customer typed just their name).
@@ -517,7 +593,25 @@ function syncOrderStateAfterInbound(conversationId, inboundText, history, produc
     merged.customer_name = String(inboundText).trim();
   }
 
-  merged.order_state = computeOrderState(merged);
+  if (
+    storeId &&
+    isClothingStore(storeId) &&
+    merged.order_product_id &&
+    !merged.order_variant_id &&
+    (merged.selected_size || merged.selected_color)
+  ) {
+    const resolved = resolveVariantForProduct(Number(merged.order_product_id), {
+      size: merged.selected_size,
+      color: merged.selected_color,
+    });
+    if (resolved) {
+      merged.order_variant_id = Number(resolved.id);
+      if (!merged.selected_size && resolved.size) merged.selected_size = resolved.size;
+      if (!merged.selected_color && resolved.color) merged.selected_color = resolved.color;
+    }
+  }
+
+  merged.order_state = computeOrderState(merged, { storeId });
   saveConversationOrderState(conversationId, merged);
   return merged;
 }
@@ -530,7 +624,7 @@ function syncOrderStateAfterInbound(conversationId, inboundText, history, produc
  * @param {{ inboundText?: string, history?: object[], products?: object[], aiReply?: string }} ctx
  */
 function prepareOrderStateForPersist(conversationId, orderState, ctx = {}) {
-  const { inboundText = "", history = [], products = [], aiReply = "" } = ctx;
+  const { inboundText = "", history = [], products = [], aiReply = "", storeId = null } = ctx;
 
   let base = { ...orderState };
   if (isNewCheckoutIntent(inboundText)) {
@@ -539,6 +633,9 @@ function prepareOrderStateForPersist(conversationId, orderState, ctx = {}) {
       order_product_id: null,
       order_product_name: null,
       order_product_ids: [],
+      order_variant_id: null,
+      selected_size: null,
+      selected_color: null,
       customer_phone: null,
       customer_name: null,
       customer_address: null,
@@ -575,11 +672,31 @@ function prepareOrderStateForPersist(conversationId, orderState, ctx = {}) {
     merged.buy_committed = 1;
   }
 
+  merged = applyApparelFieldsFromText(merged, `${inboundText}\n${aiReply}`, storeId);
+
+  if (
+    storeId &&
+    isClothingStore(storeId) &&
+    merged.order_product_id &&
+    !merged.order_variant_id &&
+    (merged.selected_size || merged.selected_color)
+  ) {
+    const resolved = resolveVariantForProduct(Number(merged.order_product_id), {
+      size: merged.selected_size,
+      color: merged.selected_color,
+    });
+    if (resolved) {
+      merged.order_variant_id = Number(resolved.id);
+      if (!merged.selected_size && resolved.size) merged.selected_size = resolved.size;
+      if (!merged.selected_color && resolved.color) merged.selected_color = resolved.color;
+    }
+  }
+
   if (/ثبّ?ت|تثبّ?ت|الطلب\s*تثبت|تثبت\s*وراح/i.test(String(aiReply || ""))) {
     merged.buy_committed = 1;
   }
 
-  merged.order_state = computeOrderState(merged);
+  merged.order_state = computeOrderState(merged, { storeId });
   saveConversationOrderState(conversationId, merged);
   return merged;
 }
@@ -621,6 +738,12 @@ function shouldAttachProductImages(history, currentText, orderState) {
  */
 function orderStateToCheckoutContext(orderState) {
   const missing = [];
+  if (orderState.order_state === ORDER_STATES.AWAITING_SIZE) {
+    missing.push("المقاس");
+  }
+  if (orderState.order_state === ORDER_STATES.AWAITING_COLOR) {
+    missing.push("اللون");
+  }
   if (!orderState.customer_name) missing.push("الاسم الثلاثي");
   if (!orderState.customer_phone) missing.push("رقم الهاتف");
   if (!orderState.customer_city && !orderState.customer_address) {

@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS products (
   name TEXT NOT NULL,
   description TEXT,
   image_url TEXT,
+  size_chart_url TEXT,
   base_price REAL NOT NULL CHECK (base_price >= 0),
   is_active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -37,6 +37,7 @@ const {
   postChannelOwnerMessage,
 } = require("../channels/channel.conversations.controller");
 const { postManagerAiChat } = require("../managerAi/managerAi.controller");
+const { clothingRouter } = require("../clothing/clothing.routes");
 
 const storesRouter = express.Router();
 
@@ -145,5 +146,7 @@ storesRouter.post(
   requirePlanFeature("owner_manager_ai"),
   postManagerAiChat
 );
+
+storesRouter.use("/:storeId/clothing", clothingRouter);
 
 module.exports = { storesRouter };

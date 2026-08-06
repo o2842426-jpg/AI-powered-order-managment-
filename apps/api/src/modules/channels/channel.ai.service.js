@@ -49,6 +49,10 @@ const {
   aiIndicatesOrderFinalized,
   reconcileConversationLinkedOrder,
 } = require("./conversationOrder.service");
+const {
+  customerEncountersApparelIssue,
+  isClothingStore,
+} = require("../clothing/clothing.service");
 
 /**
  * Append product names only — no store URLs (Instagram DM stays in-chat).
@@ -284,6 +288,35 @@ async function processChannelAiReply({
     return;
   }
 
+  // Apparel sizing confusion — route to human for clothing stores.
+  if (
+    isClothingStore(storeId) &&
+    customerEncountersApparelIssue(inboundText)
+  ) {
+    setConversationHumanTakeover(conversationId, storeId);
+
+    const sendResult = await sendInstagramTextWithEncryptedToken({
+      connection,
+      recipientIgsid: customerIgsid,
+      text: HUMAN_HANDOVER_MESSAGE,
+    });
+
+    insertOutboundChannelMessage({
+      conversationId,
+      storeId,
+      mid: sendResult.ok ? sendResult.messageId : null,
+      text: HUMAN_HANDOVER_MESSAGE,
+      senderType: "system",
+      deliveryStatus: sendResult.ok ? "sent" : "failed",
+      payload: { human_handover: true, apparel_sizing: true, ...(sendResult.ok ? {} : { send_error: sendResult.error }) },
+    });
+
+    console.info(
+      `[channel-ai] apparel sizing handover conversation=${conversationId} store=${storeId}`
+    );
+    return;
+  }
+
   const quota = evaluateAiMessageQuota(store);
   if (!quota.ok) {
     console.warn(
@@ -367,7 +400,8 @@ async function processChannelAiReply({
     conversationId,
     currentText,
     fullHistory,
-    products
+    products,
+    { storeId }
   );
   let phase = orderStateToConversationPhase(orderState.order_state);
   if (phase !== "checkout") {
@@ -439,11 +473,14 @@ async function processChannelAiReply({
       saveConversationOrderState(conversationId, {
         order_product_id: Number(product.id),
         order_product_name: String(product.name || "").trim(),
-        order_state: computeOrderState({
-          ...orderState,
-          order_product_id: Number(product.id),
-          order_product_name: String(product.name || "").trim(),
-        }),
+        order_state: computeOrderState(
+          {
+            ...orderState,
+            order_product_id: Number(product.id),
+            order_product_name: String(product.name || "").trim(),
+          },
+          { storeId }
+        ),
       });
     }
   }
@@ -468,6 +505,7 @@ async function processChannelAiReply({
       history: fullHistory,
       products,
       aiReply: aiResult.reply,
+      storeId,
     }
   );
   const linkMeta = reconcileConversationLinkedOrder(
@@ -477,8 +515,8 @@ async function processChannelAiReply({
   );
   const linkedOrderId = linkMeta.linkedOrderId;
   const shouldPersistOrder =
-    canCreateOrderFromState(persistState, linkedOrderId) ||
-    (aiIndicatesOrderFinalized(aiResult, persistState) && !linkedOrderId);
+    canCreateOrderFromState(persistState, linkedOrderId, storeId) ||
+    (aiIndicatesOrderFinalized(aiResult, persistState, storeId) && !linkedOrderId);
 
   if (shouldPersistOrder) {
     const orderResult = createOrderFromConversationState({

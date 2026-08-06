@@ -92,12 +92,16 @@ function buildCatalogText(products, currencyCode) {
       const desc = product.description
         ? String(product.description).trim().slice(0, 400)
         : "لا يوجد وصف";
+      const sizeChart = product.size_chart_url
+        ? String(product.size_chart_url).trim()
+        : null;
 
       return `منتج:
 - product_id (استخدم هذا الرقم حرفيًا في recommended_product_ids): ${productId}
 - الاسم: ${product.name}
 - وصف مختصر: ${desc}
 - السعر الأساسي: ${formatCatalogMoney(product.base_price, cur)}
+- جدول المقاسات (size_chart_url): ${sizeChart || "غير متوفر"}
 - العملة المعتمدة للمتجر: ${cur}
 - الخيارات (variants):
 ${variantsText}`;

@@ -26,6 +26,7 @@ function listProducts(req, res) {
         description,
         image_url,
         base_price,
+        size_chart_url,
         is_active,
         created_at
       FROM products
@@ -45,7 +46,7 @@ function listProducts(req, res) {
 
 function createProduct(req, res) {
   try {
-    const { store_id, name, description, image_url, base_price } = req.body;
+    const { store_id, name, description, image_url, base_price, size_chart_url } = req.body;
 
     if (!store_id || !name || base_price === undefined) {
       return res.status(400).json({
@@ -80,8 +81,8 @@ function createProduct(req, res) {
     }
 
     const insert = db.prepare(`
-      INSERT INTO products (store_id, name, description, image_url, base_price)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO products (store_id, name, description, image_url, base_price, size_chart_url)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
 
     const result = insert.run(
@@ -89,11 +90,12 @@ function createProduct(req, res) {
       String(name).trim(),
       description ?? null,
       image_url ? String(image_url).trim() : null,
-      numericPrice
+      numericPrice,
+      size_chart_url ? String(size_chart_url).trim() : null
     );
 
     const selectOne = db.prepare(`
-      SELECT id, store_id, name, description, image_url, base_price, is_active, created_at
+      SELECT id, store_id, name, description, image_url, base_price, size_chart_url, is_active, created_at
       FROM products
       WHERE id = ?
     `);
@@ -111,7 +113,7 @@ function createProduct(req, res) {
 function updateProduct(req, res) {
   try {
     const productId = Number(req.params.id);
-    const { name, description, image_url, base_price, is_active } = req.body;
+    const { name, description, image_url, base_price, is_active, size_chart_url } = req.body;
 
     if (Number.isNaN(productId) || productId <= 0) {
       return res.status(400).json({
@@ -120,7 +122,7 @@ function updateProduct(req, res) {
     }
 
     const existingProduct = db
-      .prepare("SELECT id FROM products WHERE id = ? AND store_id = ?")
+      .prepare("SELECT id, size_chart_url FROM products WHERE id = ? AND store_id = ?")
       .get(productId, req.user.store_id);
 
     if (!existingProduct) {
@@ -139,11 +141,17 @@ function updateProduct(req, res) {
     }
 
     const activeValue = is_active ? 1 : 0;
+    const nextSizeChart =
+      size_chart_url !== undefined
+        ? size_chart_url
+          ? String(size_chart_url).trim()
+          : null
+        : existingProduct.size_chart_url;
 
     db.prepare(
       `
         UPDATE products
-        SET name = ?, description = ?, image_url = ?, base_price = ?, is_active = ?
+        SET name = ?, description = ?, image_url = ?, base_price = ?, size_chart_url = ?, is_active = ?
         WHERE id = ?
       `
     ).run(
@@ -151,6 +159,7 @@ function updateProduct(req, res) {
       description ? String(description).trim() : null,
       image_url ? String(image_url).trim() : null,
       numericPrice,
+      nextSizeChart,
       activeValue,
       productId
     );
@@ -158,7 +167,7 @@ function updateProduct(req, res) {
     const updatedProduct = db
       .prepare(
         `
-          SELECT id, store_id, name, description, image_url, base_price, is_active, created_at
+          SELECT id, store_id, name, description, image_url, base_price, size_chart_url, is_active, created_at
           FROM products
           WHERE id = ?
         `

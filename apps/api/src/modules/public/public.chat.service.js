@@ -6,7 +6,7 @@ function loadActiveProductCatalog(storeId) {
   const products = db
     .prepare(
       `
-      SELECT id, name, description, image_url, base_price
+      SELECT id, name, description, image_url, base_price, size_chart_url
       FROM products
       WHERE store_id = ? AND is_active = 1
       ORDER BY id DESC

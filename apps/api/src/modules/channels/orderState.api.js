@@ -33,6 +33,8 @@ function mapOrderStateFromRow(row) {
 
 const ORDER_STATE_LABELS_AR = {
   [ORDER_STATES.AWAITING_PRODUCT]: "اختيار المنتج",
+  [ORDER_STATES.AWAITING_SIZE]: "بانتظار المقاس",
+  [ORDER_STATES.AWAITING_COLOR]: "بانتظار اللون",
   [ORDER_STATES.AWAITING_LOCATION]: "بانتظار العنوان",
   [ORDER_STATES.AWAITING_PHONE]: "بانتظار الهاتف",
   [ORDER_STATES.CONFIRMED_AWAITING_FINALIZE]: "جاهز للتثبيت",

@@ -97,6 +97,7 @@ function listChannelConversations(req, res) {
             cc.customer_handle,
             cc.customer_id,
             cc.owner_takeover,
+            cc.is_human_takeover,
             cc.lead_score,
             cc.lead_score_reason,
             cc.lead_scored_at,

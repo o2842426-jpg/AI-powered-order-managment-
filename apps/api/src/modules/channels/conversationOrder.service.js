@@ -4,6 +4,12 @@ const {
   hardResetConversationOrderState,
   getConversationLinkedOrderId,
 } = require("./channel.repository");
+const {
+  isClothingStore,
+  productHasActiveVariants,
+  resolveOrderLineVariant,
+  reduceVariantStock,
+} = require("../clothing/clothing.service");
 
 const TERMINAL_ORDER_STATUSES = new Set(["shipped", "delivered", "cancelled"]);
 
@@ -95,25 +101,38 @@ function reconcileConversationLinkedOrder(conversationId, storeId, orderState = 
 /**
  * Minimum fields required to insert an order row.
  * @param {object} orderState
+ * @param {number} [storeId]
  */
-function hasMinimumOrderFields(orderState) {
-  return Boolean(
+function hasMinimumOrderFields(orderState, storeId) {
+  const hasBase =
     orderState?.order_product_id &&
     orderState?.customer_phone &&
-    (orderState?.customer_city || orderState?.customer_address)
-  );
+    (orderState?.customer_city || orderState?.customer_address);
+
+  if (!hasBase) return false;
+
+  if (
+    storeId &&
+    isClothingStore(storeId) &&
+    orderState.order_product_id &&
+    productHasActiveVariants(orderState.order_product_id)
+  ) {
+    return Boolean(orderState.order_variant_id);
+  }
+
+  return true;
 }
 
 /**
  * @param {object} orderState
  * @param {number | null | undefined} linkedOrderId
  */
-function canCreateOrderFromState(orderState, linkedOrderId) {
+function canCreateOrderFromState(orderState, linkedOrderId, storeId) {
   if (linkedOrderId) {
     return false;
   }
 
-  if (!hasMinimumOrderFields(orderState)) {
+  if (!hasMinimumOrderFields(orderState, storeId)) {
     return false;
   }
 
@@ -146,7 +165,7 @@ function buildDeliveryAddress(orderState) {
  * @param {{ reply?: string }} aiResult
  * @param {object} orderState
  */
-function aiIndicatesOrderFinalized(aiResult, orderState) {
+function aiIndicatesOrderFinalized(aiResult, orderState, storeId) {
   const reply = String(aiResult?.reply || "");
   if (
     !/ثبّ?ت|تثبّ?ت|تثبت|الطلب\s*تثبت|سجّ?لنا|سجلنا|سجّ?ل|سجل|راح\s*يوصل|وصلك|يوصل\s*فريق|فريق\s*التوصيل|٢\s*[-–]\s*٣|2\s*[-–]\s*3\s*أيام/i.test(
@@ -155,7 +174,7 @@ function aiIndicatesOrderFinalized(aiResult, orderState) {
   ) {
     return false;
   }
-  return hasMinimumOrderFields(orderState);
+  return hasMinimumOrderFields(orderState, storeId);
 }
 
 /**
@@ -193,7 +212,7 @@ function createOrderFromConversationState({
   );
   const linkedOrderId = linkMeta.linkedOrderId;
 
-  if (!canCreateOrderFromState(orderState, linkedOrderId)) {
+  if (!canCreateOrderFromState(orderState, linkedOrderId, storeId)) {
     if (linkedOrderId && linkMeta.existingOrderId) {
       return {
         created: false,
@@ -318,17 +337,41 @@ function createOrderFromConversationState({
     const insertItem = db.prepare(
       `
         INSERT INTO order_items (order_id, product_id, variant_id, qty, unit_price, line_total)
-        VALUES (?, ?, NULL, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?)
       `
     );
 
     let orderTotal = 0;
     const qty = 1;
-    for (const p of orderProducts) {
-      const unitPrice = Number(p.base_price);
+    for (let i = 0; i < orderProducts.length; i++) {
+      const p = orderProducts[i];
+      let variantId = null;
+      let unitPrice = Number(p.base_price);
+
+      if (
+        i === 0 &&
+        isClothingStore(storeId) &&
+        productHasActiveVariants(p.id)
+      ) {
+        const line = resolveOrderLineVariant({
+          storeId,
+          productId: p.id,
+          variantId: orderState.order_variant_id,
+          size: orderState.selected_size,
+          color: orderState.selected_color,
+          qty,
+        });
+        if (!line.ok) {
+          throw new Error(`variant_resolve_failed:${line.reason}`);
+        }
+        variantId = line.variant_id;
+        unitPrice = line.unit_price;
+        reduceVariantStock(variantId, qty);
+      }
+
       const lineTotal = unitPrice * qty;
       orderTotal += lineTotal;
-      insertItem.run(orderId, Number(p.id), qty, unitPrice, lineTotal);
+      insertItem.run(orderId, Number(p.id), variantId, qty, unitPrice, lineTotal);
     }
 
     db.prepare(`UPDATE orders SET total_amount = ? WHERE id = ?`).run(orderTotal, orderId);
