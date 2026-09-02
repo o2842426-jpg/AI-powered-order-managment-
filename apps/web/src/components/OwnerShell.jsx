@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { BrandMark } from "./BrandMark";
 import { ManagerAiWidget } from "./ManagerAiWidget";
+import { verticalLabel } from "../lib/verticals/registry";
 import "./OwnerShell.css";
 
 const NAV_ITEMS = [
@@ -114,6 +115,7 @@ export function OwnerShell({
   onPreviewStore,
   billingBanner,
   billingToolbar,
+  storeVertical = null,
 }) {
   const subscriptionLabel = billingStatus?.billing_enforced
     ? billingStatus?.has_access
@@ -132,6 +134,8 @@ export function OwnerShell({
       return Array.isArray(caps) && caps.includes("conversations_dashboard");
     });
   }, [billingStatus]);
+
+  const verticalLabelText = verticalLabel(storeVertical);
 
   return (
     <div className="owner-shell">
@@ -226,6 +230,11 @@ export function OwnerShell({
           </div>
 
           <div className="owner-shell__header-right">
+            {verticalLabelText ? (
+              <span className="owner-shell__vertical-badge" title="نوع المتجر">
+                {verticalLabelText}
+              </span>
+            ) : null}
             <span className={`owner-shell__badge ${subscriptionTone}`}>{subscriptionLabel}</span>
             <button type="button" className="owner-shell__icon-btn" title="الإشعارات" aria-label="الإشعارات">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>

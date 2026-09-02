@@ -38,6 +38,7 @@ const {
 } = require("../channels/channel.conversations.controller");
 const { postManagerAiChat } = require("../managerAi/managerAi.controller");
 const { clothingRouter } = require("../clothing/clothing.routes");
+const { getStoreVerticalProfile } = require("./vertical.controller");
 
 const storesRouter = express.Router();
 
@@ -140,6 +141,7 @@ storesRouter.get("/:storeId/summary", getStoreSummary);
 storesRouter.get("/:storeId/low-stock", getStoreLowStock);
 storesRouter.get("/:storeId/settings", getStoreSettings);
 storesRouter.patch("/:storeId/settings", updateStoreSettings);
+storesRouter.get("/:storeId/vertical", getStoreVerticalProfile);
 
 storesRouter.post(
   "/:storeId/manager-ai/chat",

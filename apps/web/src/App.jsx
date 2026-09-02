@@ -47,6 +47,7 @@ function App() {
   const [postLoginView, setPostLoginView] = useState(() => computeInitialPostLoginView());
   const [orderSearch, setOrderSearch] = useState("");
   const [oauthToast, setOauthToast] = useState(null);
+  const [storeVertical, setStoreVertical] = useState(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -149,6 +150,34 @@ function App() {
       cancelled = true;
     };
   }, [ownerAuth, billingRefresh]);
+
+  useEffect(() => {
+    const storeId = ownerAuth?.user?.store_id;
+    if (!storeId) {
+      setStoreVertical(null);
+      return;
+    }
+
+    let cancelled = false;
+    authFetch(`/api/stores/${storeId}/settings`)
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        throwIfNotOk(res, body, { fallback: "تعذّر تحميل إعدادات المتجر." });
+        return body;
+      })
+      .then((body) => {
+        if (!cancelled) {
+          setStoreVertical(body?.data?.store_vertical ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setStoreVertical(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerAuth?.user?.store_id, billingRefresh]);
 
   useEffect(() => {
     if (
@@ -456,6 +485,7 @@ function App() {
           upgradeNavActive={upgradeNavActive}
           onNavigate={(id) => openOwnerView(id)}
           billingStatus={billingStatus}
+          storeVertical={storeVertical}
           onLogout={logoutOwner}
           onPreviewStore={() => setView("store")}
           headerSearch={orderSearch}
