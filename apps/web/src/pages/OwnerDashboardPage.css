@@ -816,6 +816,100 @@
   margin-top: var(--dm-space-3);
 }
 
+.owner-dashboard__clothing-widgets {
+  margin: 0 0 var(--dm-space-4);
+  padding: var(--dm-space-5);
+  border-radius: var(--dm-radius-lg);
+  background: var(--dm-color-surface);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+}
+
+.owner-dashboard__clothing-widgets-head {
+  margin-bottom: var(--dm-space-4);
+}
+
+.owner-dashboard__clothing-widgets-head h2 {
+  margin: 0 0 var(--dm-space-2);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.owner-dashboard__clothing-widgets-head p:not(.owner-dashboard__eyebrow) {
+  margin: 0;
+  color: var(--dm-color-muted, #a1a1aa);
+  max-width: 42rem;
+}
+
+.owner-dashboard__clothing-widgets-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--dm-space-3);
+}
+
+.owner-dashboard__clothing-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dm-space-3);
+  margin: 0;
+}
+
+.owner-dashboard__clothing-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.owner-dashboard__size-stock-panel {
+  margin-bottom: var(--dm-space-4);
+  padding: var(--dm-space-4);
+  border-radius: var(--dm-radius-md);
+  border: 1px solid var(--dm-color-border, #27272a);
+  background: rgba(24, 24, 27, 0.55);
+}
+
+.owner-dashboard__size-stock-panel--takeover {
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.owner-dashboard__size-stock-panel h3 {
+  margin: 0 0 var(--dm-space-2);
+}
+
+.owner-dashboard__size-stock-list,
+.owner-dashboard__takeover-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--dm-space-2);
+}
+
+.owner-dashboard__size-stock-list li,
+.owner-dashboard__takeover-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--dm-radius-sm, 8px);
+  background: rgba(39, 39, 42, 0.65);
+}
+
+.owner-dashboard__size-stock-list strong,
+.owner-dashboard__takeover-list strong {
+  font-size: 0.92rem;
+}
+
+.owner-dashboard__size-stock-list span,
+.owner-dashboard__takeover-list small {
+  color: var(--dm-color-muted, #a1a1aa);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 800px) {
+  .owner-dashboard__clothing-widgets-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .owner-dashboard__low-stock-flow {
   margin-bottom: var(--dm-space-4);
   padding: var(--dm-space-5);

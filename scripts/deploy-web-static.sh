@@ -9,7 +9,19 @@ WEB_ROOT="${WEB_ROOT:-/var/www/shopiq}"
 
 cd "$ROOT"
 
-echo "=== Building web ==="
+# Vite bakes VITE_* at build time — without this, fetch() hits shopiq.me and POST /api/* returns 405.
+if [[ -z "${VITE_API_URL:-}" && -f "$ROOT/.env" ]]; then
+  VITE_API_URL="$(grep -E '^VITE_API_URL=' "$ROOT/.env" | tail -1 | cut -d= -f2- | tr -d '\r' | sed 's/^["'\'' ]//;s/["'\'' ]$//')"
+  export VITE_API_URL
+fi
+
+if [[ -z "${VITE_API_URL:-}" ]]; then
+  echo "ERROR: VITE_API_URL is not set. Example:"
+  echo "  VITE_API_URL=https://api.shopiq.me npm run build:web"
+  exit 1
+fi
+
+echo "=== Building web (VITE_API_URL=${VITE_API_URL}) ==="
 npm run build:web
 
 if [[ ! -d apps/web/dist ]]; then

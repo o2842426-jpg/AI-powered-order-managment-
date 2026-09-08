@@ -1,4 +1,17 @@
 /**
+ * When the static site is on shopiq.me and API on api.shopiq.me, use the API host
+ * even if VITE_API_URL was missing at build time (avoids POST /api/* → 405 on nginx static).
+ */
+function productionApiFallback() {
+  if (typeof window === "undefined") return "";
+  const host = window.location.hostname.toLowerCase();
+  if (host === "shopiq.me" || host === "www.shopiq.me") {
+    return "https://api.shopiq.me";
+  }
+  return "";
+}
+
+/**
  * Base URL for API calls.
  * - Dev: leave VITE_API_URL unset and use Vite proxy (/api -> localhost:4000).
  * - Prod: set VITE_API_URL to your API origin only (scheme + host + port), e.g. https://api.example.com — no trailing /api (paths already include /api/...).
@@ -6,9 +19,9 @@
 export function getApiBase() {
   const fromEnv = import.meta.env.VITE_API_URL;
   if (fromEnv && String(fromEnv).trim()) {
-    return String(fromEnv).replace(/\/$/, '');
+    return String(fromEnv).replace(/\/$/, "");
   }
-  return '';
+  return productionApiFallback();
 }
 
 export function apiUrl(path) {

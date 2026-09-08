@@ -384,6 +384,7 @@ function App() {
           key={`orders-${ownerAuth.user?.store_id ?? ownerAuth.user?.id ?? "u"}`}
           searchQuery={orderSearch}
           onSearchChange={setOrderSearch}
+          storeVertical={storeVertical}
         />
       );
     }
@@ -429,6 +430,7 @@ function App() {
           onPreviewStore={() => setView("store")}
           onGoUpgrade={() => setView("upgrade")}
           billingStatus={billingStatus}
+          storeVertical={storeVertical}
         />
       );
     }

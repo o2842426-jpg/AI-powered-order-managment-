@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { authFetch, getOwnerStoreIdFromAuth } from '../lib/auth';
 import { throwIfNotOk, userErrorMessage, withNetworkError } from '../lib/apiErrors';
 import { formatStoreMoney, normalizeStoreCurrencyCode } from '../lib/storeCurrency';
+import { optionSlotLabels } from '../lib/productOptions';
+import { isClothingVertical } from '../lib/verticals/registry';
 import './OwnerOrdersPage.css';
 
 const ORDER_STATUSES = [
@@ -21,7 +23,13 @@ const STATUS_LABELS = {
   cancelled: 'ملغي',
 };
 
-export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange } = {}) {
+export function OwnerOrdersPage({
+  searchQuery: controlledSearch,
+  onSearchChange,
+  storeVertical = null,
+} = {}) {
+  const isClothing = isClothingVertical(storeVertical);
+  const optionLabels = optionSlotLabels(isClothing);
   const storeId = getOwnerStoreIdFromAuth();
   const [orders, setOrders] = useState([]);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
@@ -505,9 +513,10 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
                 <thead>
                   <tr>
                     <th>المنتج</th>
-                    <th>المواصفة 1</th>
-                    <th>المواصفة 2</th>
+                    <th>{optionLabels.orderSlot1}</th>
+                    <th>{optionLabels.orderSlot2}</th>
                     <th>SKU</th>
+                    {isClothing ? <th>Variant</th> : null}
                     <th>الكمية</th>
                     <th>سعر الوحدة</th>
                     <th>الإجمالي</th>
@@ -520,6 +529,11 @@ export function OwnerOrdersPage({ searchQuery: controlledSearch, onSearchChange 
                       <td>{it.variant_size ?? '—'}</td>
                       <td>{it.variant_color ?? '—'}</td>
                       <td dir="ltr">{it.variant_sku ?? '—'}</td>
+                      {isClothing ? (
+                        <td dir="ltr">
+                          <small>{it.variant_id ?? '—'}</small>
+                        </td>
+                      ) : null}
                       <td>{it.qty}</td>
                       <td>{formatStoreMoney(it.unit_price, detailCurrency)}</td>
                       <td>{formatStoreMoney(it.line_total, detailCurrency)}</td>

@@ -8,12 +8,13 @@ import {
 import { authFetch, getOwnerStoreIdFromAuth } from "../lib/auth";
 import { throwIfNotOk, userErrorMessage } from "../lib/apiErrors";
 import { buildPublicStorefrontUrl } from "../lib/storefrontUrl";
-import { formatProductOptionSummary } from "../lib/productOptions";
+import { formatProductOptionSummary, optionSlotLabels, groupLowStockBySize } from "../lib/productOptions";
 import {
   DEFAULT_PAYMENT_OPTIONS,
   REPLY_DIALECT_OPTIONS,
   STORE_VERTICAL_OPTIONS,
 } from "../lib/storeOnboarding";
+import { isClothingVertical } from "../lib/verticals/registry";
 import { OwnerMetricCard } from "../components/OwnerMetricCard";
 import "./OwnerDashboardPage.css";
 
@@ -21,6 +22,7 @@ const EMPTY_PRODUCT = {
   name: "",
   description: "",
   image_url: "",
+  size_chart_url: "",
   base_price: "",
 };
 const EMPTY_VARIANT = {
@@ -258,6 +260,7 @@ export function OwnerDashboardPage({
   onPreviewStore,
   onGoUpgrade,
   billingStatus = null,
+  storeVertical = null,
 }) {
   const storeId = getOwnerStoreIdFromAuth();
   const [settings, setSettings] = useState(null);
@@ -266,6 +269,9 @@ export function OwnerDashboardPage({
   const [lowStockItems, setLowStockItems] = useState([]);
   const [lowStockLoading, setLowStockLoading] = useState(false);
   const [lowStockError, setLowStockError] = useState("");
+  const [sizingTakeovers, setSizingTakeovers] = useState([]);
+  const [sizingTakeoversLoading, setSizingTakeoversLoading] = useState(false);
+  const [sizingTakeoversError, setSizingTakeoversError] = useState("");
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMsg, setSettingsMsg] = useState("");
   const [settingsError, setSettingsError] = useState("");
@@ -321,12 +327,22 @@ export function OwnerDashboardPage({
     const caps = billingStatus?.capabilities;
     return Array.isArray(caps) && caps.includes("advanced_analytics");
   }, [billingStatus]);
+
+  const isClothing = isClothingVertical(storeVertical || settings?.store_vertical);
+  const optionLabels = optionSlotLabels(isClothing);
+  const lowStockBySize = useMemo(
+    () => (isClothing ? groupLowStockBySize(lowStockItems) : []),
+    [isClothing, lowStockItems]
+  );
+
   useEffect(() => {
     if (!storeId) {
       setSummary(null);
       setSummaryError("");
       setLowStockItems([]);
       setLowStockError("");
+      setSizingTakeovers([]);
+      setSizingTakeoversError("");
       setSettings(null);
       setSettingsError("");
       setProducts([]);
@@ -358,6 +374,15 @@ export function OwnerDashboardPage({
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [panel]);
+
+  useEffect(() => {
+    const clothing = isClothingVertical(storeVertical || settings?.store_vertical);
+    if (!storeId || !clothing || (panel !== "overview" && panel !== "inventory")) {
+      return;
+    }
+    void loadSizingTakeovers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, panel, storeVertical, settings?.store_vertical]);
 
   useEffect(() => {
     if (!storeId || panel !== "settings") {
@@ -456,6 +481,7 @@ export function OwnerDashboardPage({
       name: selected.name,
       description: selected.description ?? "",
       image_url: selected.image_url ?? "",
+      size_chart_url: selected.size_chart_url ?? "",
       base_price: selected.base_price,
       is_active: Boolean(selected.is_active),
     });
@@ -560,6 +586,36 @@ export function OwnerDashboardPage({
       setLowStockItems([]);
     } finally {
       setLowStockLoading(false);
+    }
+  }
+
+  async function loadSizingTakeovers() {
+    if (!storeId) return;
+    setSizingTakeoversLoading(true);
+    setSizingTakeoversError("");
+    try {
+      const res = await authFetch(
+        `/api/stores/${encodeURIComponent(storeId)}/channel-conversations?limit=40`
+      );
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 403 && body.code === "PLAN_REQUIRED") {
+        setSizingTakeovers([]);
+        return;
+      }
+      if (!res.ok) {
+        throwIfNotOk(res, body, { fallback: "تعذّر تحميل محادثات التدخل." });
+      }
+      const rows = Array.isArray(body.data) ? body.data : [];
+      setSizingTakeovers(
+        rows.filter((row) => Number(row.is_human_takeover) === 1).slice(0, 8)
+      );
+    } catch (error) {
+      setSizingTakeoversError(
+        userErrorMessage(error, { fallback: "تعذّر تحميل محادثات المقاسات." })
+      );
+      setSizingTakeovers([]);
+    } finally {
+      setSizingTakeoversLoading(false);
     }
   }
 
@@ -723,6 +779,7 @@ export function OwnerDashboardPage({
           name: productDraft.name,
           description: productDraft.description || null,
           image_url: productDraft.image_url || null,
+          size_chart_url: productDraft.size_chart_url || null,
           base_price: Number(productDraft.base_price),
         }),
       });
@@ -756,6 +813,7 @@ export function OwnerDashboardPage({
         body: JSON.stringify({
           ...productEdit,
           base_price: Number(productEdit.base_price),
+          size_chart_url: productEdit.size_chart_url || null,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -1125,8 +1183,12 @@ export function OwnerDashboardPage({
       target: "products",
     },
     {
-      label: "أضف مواصفات خيارات المنتج والمخزون",
-      hint: "أضف مواصفات الخيارات والكمية لتكون الطلبات أوضح للعميل.",
+      label: isClothing
+        ? "أضف المقاسات والألوان والمخزون"
+        : "أضف مواصفات خيارات المنتج والمخزون",
+      hint: isClothing
+        ? "أضف مقاس × لون لكل توزيعة مخزون حتى يسأل البوت العميل بشكل صحيح."
+        : "أضف مواصفات الخيارات والكمية لتكون الطلبات أوضح للعميل.",
       done: hasSelectedProductOptions,
       target: "products",
     },
@@ -1600,6 +1662,84 @@ export function OwnerDashboardPage({
         </section>
       ) : null}
 
+      {showOverview && isClothing && (
+        <section className="owner-dashboard__clothing-widgets" aria-label="ملخص الملابس">
+          <div className="owner-dashboard__clothing-widgets-head">
+            <p className="owner-dashboard__eyebrow">ملابس وأزياء</p>
+            <h2>متابعة المقاسات والتدخل البشري</h2>
+            <p>
+              ملخص سريع للمخزون حسب المقاس ومحادثات تحتاج تدخلك (مثل استفسارات المقاس).
+            </p>
+          </div>
+
+          <div className="owner-dashboard__clothing-widgets-grid">
+            <article className="owner-dashboard__card owner-dashboard__clothing-card">
+              <h3>مخزون منخفض حسب المقاس</h3>
+              {lowStockLoading ? (
+                <p className="owner-dashboard__muted">جاري التحديث…</p>
+              ) : lowStockBySize.length === 0 ? (
+                <p className="owner-dashboard__muted">لا يوجد مخزون منخفض حسب المقاس.</p>
+              ) : (
+                <ul className="owner-dashboard__size-stock-list">
+                  {lowStockBySize.map((row) => (
+                    <li key={row.size}>
+                      <strong>{row.size}</strong>
+                      <span>
+                        {row.count} خيار · {row.out_of_stock} نفد · باقي {row.units}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                className="dm-btn dm-btn--secondary"
+                onClick={() => onNavigate?.("inventory")}
+              >
+                فتح المخزون
+              </button>
+            </article>
+
+            <article className="owner-dashboard__card owner-dashboard__clothing-card">
+              <h3>محادثات تحتاج تدخل (مقاسات)</h3>
+              {sizingTakeoversLoading ? (
+                <p className="owner-dashboard__muted">جاري التحميل…</p>
+              ) : sizingTakeoversError ? (
+                <p className="owner-dashboard__error">{sizingTakeoversError}</p>
+              ) : sizingTakeovers.length === 0 ? (
+                <p className="owner-dashboard__muted">لا محادثات معلّقة للتدخل الآن.</p>
+              ) : (
+                <ul className="owner-dashboard__takeover-list">
+                  {sizingTakeovers.map((row) => (
+                    <li key={row.id}>
+                      <strong>
+                        {row.customer_name ||
+                          row.customer_handle ||
+                          row.platform_username ||
+                          `محادثة #${row.id}`}
+                      </strong>
+                      <small>
+                        {row.order_product_name
+                          ? `${row.order_product_name} · `
+                          : ""}
+                        {(row.last_message_preview || "—").slice(0, 80)}
+                      </small>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                className="dm-btn dm-btn--secondary"
+                onClick={() => onNavigate?.("conversations")}
+              >
+                فتح المحادثات
+              </button>
+            </article>
+          </div>
+        </section>
+      )}
+
       <section className="owner-dashboard__onboarding">
         <div className="owner-dashboard__onboarding-intro">
           <p className="owner-dashboard__eyebrow">ابدأ من هنا</p>
@@ -1699,6 +1839,67 @@ export function OwnerDashboardPage({
         </div>
 
         {lowStockError && <p className="owner-dashboard__error">{lowStockError}</p>}
+
+        {isClothing && lowStockBySize.length > 0 && (
+          <div className="owner-dashboard__size-stock-panel">
+            <h3>تجميع حسب المقاس</h3>
+            <ul className="owner-dashboard__size-stock-list">
+              {lowStockBySize.map((row) => (
+                <li key={`inv-${row.size}`}>
+                  <strong>{row.size}</strong>
+                  <span>
+                    {row.count} خيار · {row.out_of_stock} نفد · باقي {row.units}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {isClothing && (
+          <div className="owner-dashboard__size-stock-panel owner-dashboard__size-stock-panel--takeover">
+            <div className="owner-dashboard__section-head">
+              <div>
+                <h3>تدخل بشري (مقاسات)</h3>
+                <p className="owner-dashboard__muted">
+                  محادثات معلّقة لأن العميل يحتاج مساعدة في المقاس أو المقاسات غير واضحة.
+                </p>
+              </div>
+              <button type="button" onClick={loadSizingTakeovers} disabled={sizingTakeoversLoading}>
+                {sizingTakeoversLoading ? "جاري التحديث..." : "تحديث"}
+              </button>
+            </div>
+            {sizingTakeoversError && (
+              <p className="owner-dashboard__error">{sizingTakeoversError}</p>
+            )}
+            {!sizingTakeoversLoading && sizingTakeovers.length === 0 && (
+              <p className="owner-dashboard__muted">لا محادثات معلّقة للتدخل.</p>
+            )}
+            {sizingTakeovers.length > 0 && (
+              <ul className="owner-dashboard__takeover-list">
+                {sizingTakeovers.map((row) => (
+                  <li key={`inv-takeover-${row.id}`}>
+                    <strong>
+                      {row.customer_name ||
+                        row.customer_handle ||
+                        row.platform_username ||
+                        `محادثة #${row.id}`}
+                    </strong>
+                    <small>{(row.last_message_preview || "—").slice(0, 100)}</small>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button
+              type="button"
+              className="dm-btn dm-btn--secondary"
+              onClick={() => onNavigate?.("conversations")}
+            >
+              فتح المحادثات
+            </button>
+          </div>
+        )}
+
         {!lowStockLoading && lowStockItems.length === 0 && (
           <div className="owner-dashboard__low-stock-empty">
             <strong>المخزون مطمئن الآن</strong>
@@ -2236,8 +2437,9 @@ export function OwnerDashboardPage({
         <article className="owner-dashboard__card" id="add-product">
           <h2>إضافة منتج</h2>
           <p className="owner-dashboard__muted owner-dashboard__muted--tight">
-            أنشئ المنتج بالاسم والسعر الأساسي. الخيارات (أكثر من مواصفة أو مخزون منفصل){" "}
-            <strong>اختيارية</strong> — تضيفها لاحقًا من «تعديل» دون أن يمنعك النظام.
+            {isClothing
+              ? "أنشئ المنتج بالاسم والسعر الأساسي، ثم أضف المقاسات والألوان من «تعديل»."
+              : "أنشئ المنتج بالاسم والسعر الأساسي. الخيارات (أكثر من مواصفة أو مخزون منفصل) اختيارية — تضيفها لاحقًا من «تعديل» دون أن يمنعك النظام."}
           </p>
           <label>
             الاسم
@@ -2309,6 +2511,23 @@ export function OwnerDashboardPage({
               }
             />
           </label>
+          {isClothing ? (
+            <label>
+              رابط جدول المقاسات (اختياري)
+              <input
+                type="url"
+                dir="ltr"
+                placeholder="https://example.com/size-chart.jpg"
+                value={productDraft.size_chart_url}
+                onChange={(event) =>
+                  setProductDraft({
+                    ...productDraft,
+                    size_chart_url: event.target.value,
+                  })
+                }
+              />
+            </label>
+          ) : null}
           <button
             type="button"
             onClick={createProduct}
@@ -2525,6 +2744,23 @@ export function OwnerDashboardPage({
                 }
               />
             </label>
+            {isClothing ? (
+              <label>
+                رابط جدول المقاسات (اختياري)
+                <input
+                  type="url"
+                  dir="ltr"
+                  placeholder="https://example.com/size-chart.jpg"
+                  value={productEdit.size_chart_url || ""}
+                  onChange={(event) =>
+                    setProductEdit({
+                      ...productEdit,
+                      size_chart_url: event.target.value,
+                    })
+                  }
+                />
+              </label>
+            ) : null}
             <label className="owner-dashboard__check">
               <input
                 type="checkbox"
@@ -2544,36 +2780,31 @@ export function OwnerDashboardPage({
           </article>
 
           <article className="owner-dashboard__card owner-dashboard__card--optional-options">
-            <h2>خيارات المنتج (اختياري)</h2>
-            <p className="owner-dashboard__muted">
-              استخدم هذا القسم فقط إذا كان منتجك يتضمن أكثر من شكل: سعة، لون، نكهة، تخزين، إصدار،
-              وزن، مادة، عبوة… يمكن ترك المواصفة 1 و 2 فارغين إذا كان الخيار يُعرّف بالمخزون أو الـ SKU
-              فقط.
-            </p>
+            <h2>{optionLabels.sectionTitle}</h2>
+            <p className="owner-dashboard__muted">{optionLabels.sectionLead}</p>
             <p className="owner-dashboard__muted owner-dashboard__muted--tight">
-              إن لم تضف أي خيار، يبقى المنتج <strong>بسيطًا</strong>: يظهر للعميل بالسعر الأساسي دون خطوة
-              اختيار في المتجر.
+              {optionLabels.sectionHint}
             </p>
 
-            <h3 className="owner-dashboard__options-subtitle">إضافة خيار جديد</h3>
+            <h3 className="owner-dashboard__options-subtitle">{optionLabels.addSubtitle}</h3>
             <div className="owner-dashboard__compact-grid owner-dashboard__option-form">
               <div className="owner-dashboard__option-field">
-                <span className="owner-dashboard__option-label">مواصفة 1 — الحجم / السعة / النكهة</span>
+                <span className="owner-dashboard__option-label">{optionLabels.slot1}</span>
                 <input
                   className="owner-dashboard__option-input"
                   value={variantDraft.size}
-                  placeholder="مثال: M أو 500ml"
+                  placeholder={optionLabels.slot1Placeholder}
                   onChange={(event) =>
                     setVariantDraft({ ...variantDraft, size: event.target.value })
                   }
                 />
               </div>
               <div className="owner-dashboard__option-field">
-                <span className="owner-dashboard__option-label">مواصفة 2 — اللون / الإصدار / العبوة</span>
+                <span className="owner-dashboard__option-label">{optionLabels.slot2}</span>
                 <input
                   className="owner-dashboard__option-input"
                   value={variantDraft.color}
-                  placeholder="مثال: أحمر أو v2"
+                  placeholder={optionLabels.slot2Placeholder}
                   onChange={(event) =>
                     setVariantDraft({ ...variantDraft, color: event.target.value })
                   }
@@ -2630,16 +2861,13 @@ export function OwnerDashboardPage({
               onClick={createVariant}
               disabled={variantSaving || !newVariantStockValid}
             >
-              {variantSaving ? "جاري الحفظ..." : "إضافة خيار"}
+              {variantSaving ? "جاري الحفظ..." : optionLabels.addButton}
             </button>
 
-            <h3 className="owner-dashboard__options-subtitle">الخيارات الحالية</h3>
+            <h3 className="owner-dashboard__options-subtitle">{optionLabels.currentSubtitle}</h3>
             {variantsLoading && <p className="owner-dashboard__muted">جاري التحميل...</p>}
             {!variantsLoading && variants.length === 0 && (
-              <p className="owner-dashboard__muted">
-                لا توجد خيارات بعد — المنتج يُعرض كمنتج بسيط بالسعر الأساسي. أضف خيارًا عند الحاجة
-                لتعدد المواصفات أو لتتبّع مخزون أدق.
-              </p>
+              <p className="owner-dashboard__muted">{optionLabels.empty}</p>
             )}
             {variants.length > 0 && (
               <div className="owner-dashboard__variant-grid">
@@ -2680,22 +2908,22 @@ export function OwnerDashboardPage({
 
                       <div className="owner-dashboard__variant-fields owner-dashboard__option-form">
                         <div className="owner-dashboard__option-field">
-                          <span className="owner-dashboard__option-label">مواصفة 1 — الحجم / السعة</span>
+                          <span className="owner-dashboard__option-label">{optionLabels.slot1}</span>
                           <input
                             className="owner-dashboard__option-input"
                             value={variant.size || ""}
-                            placeholder="مثال: M"
+                            placeholder={optionLabels.slot1Placeholder}
                             onChange={(event) =>
                               updateVariantDraft(index, "size", event.target.value)
                             }
                           />
                         </div>
                         <div className="owner-dashboard__option-field">
-                          <span className="owner-dashboard__option-label">مواصفة 2 — اللون / الإصدار</span>
+                          <span className="owner-dashboard__option-label">{optionLabels.slot2}</span>
                           <input
                             className="owner-dashboard__option-input"
                             value={variant.color || ""}
-                            placeholder="مثال: أحمر"
+                            placeholder={optionLabels.slot2Placeholder}
                             onChange={(event) =>
                               updateVariantDraft(index, "color", event.target.value)
                             }
