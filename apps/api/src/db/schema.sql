@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS stores (
   reply_dialect TEXT,
   default_payment TEXT,
   sell_summary TEXT,
+  ai_sales_aggression TEXT,
+  ai_persona_tone TEXT,
   subscription_status TEXT DEFAULT 'active',
   stripe_customer_id TEXT,
   stripe_subscription_id TEXT,

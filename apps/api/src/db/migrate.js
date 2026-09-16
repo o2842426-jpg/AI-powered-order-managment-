@@ -29,6 +29,22 @@ function migrate(db) {
   ensureOrderHiddenColumn(db);
   ensureProductSizeChartColumn(db);
   ensureChannelApparelColumns(db);
+  ensureStoreAiTrainingColumns(db);
+}
+
+/** Bot training: sales aggression + persona tone (owner dashboard Phase 3). */
+function ensureStoreAiTrainingColumns(db) {
+  const columns = db.prepare("PRAGMA table_info(stores)").all();
+  const names = new Set(columns.map((c) => c.name));
+  const additions = [
+    ["ai_sales_aggression", "TEXT"],
+    ["ai_persona_tone", "TEXT"],
+  ];
+  for (const [name, ddl] of additions) {
+    if (!names.has(name)) {
+      db.exec(`ALTER TABLE stores ADD COLUMN ${name} ${ddl}`);
+    }
+  }
 }
 
 function ensureStoreSettingsColumns(db) {

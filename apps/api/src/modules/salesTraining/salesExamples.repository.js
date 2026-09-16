@@ -69,9 +69,27 @@ function insertSalesExample({ storeId, category, userInput, idealResponse }) {
   );
 }
 
+/**
+ * @param {number} storeId
+ * @param {number} exampleId
+ * @returns {boolean}
+ */
+function deleteSalesExample(storeId, exampleId) {
+  const result = db
+    .prepare(
+      `
+        DELETE FROM sales_examples
+        WHERE id = ? AND store_id = ?
+      `
+    )
+    .run(exampleId, storeId);
+  return Number(result.changes) > 0;
+}
+
 module.exports = {
   listSalesExamplesForStore,
   insertSalesExample,
+  deleteSalesExample,
   DEFAULT_LIMIT,
   MAX_LIMIT,
 };

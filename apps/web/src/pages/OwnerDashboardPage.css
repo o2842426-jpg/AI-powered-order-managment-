@@ -1693,6 +1693,130 @@
   margin: var(--dm-space-2) 0 var(--dm-space-3);
 }
 
+.owner-dashboard__training {
+  margin: 0 0 var(--dm-space-4);
+  padding: var(--dm-space-4);
+  border-radius: var(--dm-radius-md);
+  border: 1px solid var(--dm-color-border, #27272a);
+  background: rgba(24, 24, 27, 0.45);
+}
+
+.owner-dashboard__training--examples {
+  margin-top: var(--dm-space-4);
+}
+
+.owner-dashboard__training-title {
+  margin: 0 0 var(--dm-space-2);
+  font-size: 1.05rem;
+}
+
+.owner-dashboard__training-fieldset {
+  border: 0;
+  margin: var(--dm-space-3) 0 0;
+  padding: 0;
+}
+
+.owner-dashboard__training-fieldset legend {
+  margin-bottom: var(--dm-space-2);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--dm-color-muted, #a1a1aa);
+}
+
+.owner-dashboard__training-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--dm-space-2);
+}
+
+.owner-dashboard__training-options--tones {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.owner-dashboard__training-option {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  padding: 0.7rem 0.75rem;
+  border-radius: var(--dm-radius-sm, 8px);
+  border: 1px solid var(--dm-color-border, #27272a);
+  background: rgba(39, 39, 42, 0.45);
+  cursor: pointer;
+}
+
+.owner-dashboard__training-option.is-active {
+  border-color: rgba(99, 102, 241, 0.55);
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.owner-dashboard__training-option input {
+  margin-top: 0.2rem;
+}
+
+.owner-dashboard__training-option strong {
+  display: block;
+  font-size: 0.9rem;
+}
+
+.owner-dashboard__training-option small {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--dm-color-muted, #a1a1aa);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.owner-dashboard__training-examples {
+  list-style: none;
+  margin: var(--dm-space-3) 0;
+  padding: 0;
+  display: grid;
+  gap: var(--dm-space-2);
+}
+
+.owner-dashboard__training-examples li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--dm-space-3);
+  align-items: flex-start;
+  padding: 0.75rem;
+  border-radius: var(--dm-radius-sm, 8px);
+  background: rgba(39, 39, 42, 0.55);
+}
+
+.owner-dashboard__training-examples em {
+  display: inline-block;
+  margin-bottom: 0.35rem;
+  font-size: 0.72rem;
+  color: #a5b4fc;
+  font-style: normal;
+}
+
+.owner-dashboard__training-examples strong,
+.owner-dashboard__training-examples span {
+  display: block;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.owner-dashboard__training-examples span {
+  margin-top: 0.25rem;
+  color: var(--dm-color-muted, #a1a1aa);
+  font-weight: 400;
+}
+
+.owner-dashboard__training-form {
+  display: grid;
+  gap: var(--dm-space-3);
+}
+
+@media (max-width: 800px) {
+  .owner-dashboard__training-options,
+  .owner-dashboard__training-options--tones {
+    grid-template-columns: 1fr;
+  }
+}
+
 .owner-dashboard__error {
   color: #b91c1c;
   font-size: 0.88rem;

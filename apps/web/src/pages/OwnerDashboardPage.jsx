@@ -51,6 +51,47 @@ const AI_STYLE_PRESETS = [
   },
 ];
 
+const SALES_AGGRESSION_OPTIONS = [
+  {
+    id: "soft",
+    label: "هادئ",
+    hint: "أقل إلحاح — طمأنة وثقة قبل الشراء",
+  },
+  {
+    id: "balanced",
+    label: "متوازن",
+    hint: "واضح ومحترم — CTA بدون ضغط زائد",
+  },
+  {
+    id: "aggressive",
+    label: "إغلاق قوي",
+    hint: "سعر + توفر + خطوة تالية بسرعة",
+  },
+];
+
+const PERSONA_TONE_OPTIONS = [
+  { id: "warm", label: "ودي" },
+  { id: "concise", label: "مختصر" },
+  { id: "luxury", label: "فاخر" },
+  { id: "energetic", label: "حيوي" },
+];
+
+const SALES_EXAMPLE_CATEGORIES = [
+  { id: "greeting", label: "ترحيب" },
+  { id: "discovery", label: "اكتشاف" },
+  { id: "price", label: "سعر" },
+  { id: "objection", label: "اعتراض" },
+  { id: "hesitant", label: "تردد" },
+  { id: "closing", label: "إغلاق" },
+  { id: "general", label: "عام" },
+];
+
+const EMPTY_SALES_EXAMPLE = {
+  category: "discovery",
+  user_input: "",
+  ideal_response: "",
+};
+
 /** يُستخدم إذا كان الـ API لا يزال يعيد ملخصًا بدون حقل analytics */
 const EMPTY_DASHBOARD_ANALYTICS = {
   clv: {
@@ -310,6 +351,12 @@ export function OwnerDashboardPage({
   const [aiFollowupNewText, setAiFollowupNewText] = useState("");
   const [aiFollowupSaving, setAiFollowupSaving] = useState(false);
 
+  const [salesExamples, setSalesExamples] = useState([]);
+  const [salesExamplesLoading, setSalesExamplesLoading] = useState(false);
+  const [salesExamplesError, setSalesExamplesError] = useState("");
+  const [salesExampleDraft, setSalesExampleDraft] = useState(EMPTY_SALES_EXAMPLE);
+  const [salesExampleSaving, setSalesExampleSaving] = useState(false);
+
   const canAiFollowups = useMemo(() => {
     if (!billingStatus?.billing_enforced) return true;
     const caps = billingStatus?.capabilities;
@@ -392,6 +439,17 @@ export function OwnerDashboardPage({
       return;
     }
     void loadInstagramConnection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, panel]);
+
+  useEffect(() => {
+    if (!storeId || panel !== "ai") {
+      setSalesExamples([]);
+      setSalesExamplesError("");
+      setSalesExamplesLoading(false);
+      return;
+    }
+    void loadSalesExamples();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId, panel]);
 
@@ -503,6 +561,84 @@ export function OwnerDashboardPage({
     } catch (error) {
       setSettingsError(userErrorMessage(error, { fallback: "تعذر تحميل إعدادات المتجر." }));
       setSettings(null);
+    }
+  }
+
+  async function loadSalesExamples() {
+    if (!storeId) return;
+    setSalesExamplesLoading(true);
+    setSalesExamplesError("");
+    try {
+      const res = await authFetch(
+        `/api/dashboard/settings/examples?store_id=${encodeURIComponent(storeId)}`
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throwIfNotOk(res, body, { fallback: "تعذّر تحميل أمثلة التدريب." });
+      }
+      setSalesExamples(Array.isArray(body.data) ? body.data : []);
+    } catch (error) {
+      setSalesExamplesError(
+        userErrorMessage(error, { fallback: "تعذّر تحميل أمثلة التدريب." })
+      );
+      setSalesExamples([]);
+    } finally {
+      setSalesExamplesLoading(false);
+    }
+  }
+
+  async function addSalesExample() {
+    if (!storeId) return;
+    const userInput = String(salesExampleDraft.user_input || "").trim();
+    const idealResponse = String(salesExampleDraft.ideal_response || "").trim();
+    if (!userInput || !idealResponse) {
+      setSalesExamplesError("أدخل سؤال الزبون والرد المثالي.");
+      return;
+    }
+    setSalesExampleSaving(true);
+    setSalesExamplesError("");
+    try {
+      const res = await authFetch("/api/dashboard/settings/examples", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          store_id: Number(storeId),
+          category: salesExampleDraft.category || "general",
+          user_input: userInput,
+          ideal_response: idealResponse,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throwIfNotOk(res, body, { fallback: "تعذّر حفظ المثال." });
+      }
+      setSalesExampleDraft(EMPTY_SALES_EXAMPLE);
+      await loadSalesExamples();
+    } catch (error) {
+      setSalesExamplesError(userErrorMessage(error, { fallback: "تعذّر حفظ المثال." }));
+    } finally {
+      setSalesExampleSaving(false);
+    }
+  }
+
+  async function removeSalesExample(exampleId) {
+    if (!storeId || !exampleId) return;
+    setSalesExampleSaving(true);
+    setSalesExamplesError("");
+    try {
+      const res = await authFetch(
+        `/api/dashboard/settings/examples/${encodeURIComponent(exampleId)}?store_id=${encodeURIComponent(storeId)}`,
+        { method: "DELETE" }
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throwIfNotOk(res, body, { fallback: "تعذّر حذف المثال." });
+      }
+      await loadSalesExamples();
+    } catch (error) {
+      setSalesExamplesError(userErrorMessage(error, { fallback: "تعذّر حذف المثال." }));
+    } finally {
+      setSalesExampleSaving(false);
     }
   }
 
@@ -2251,6 +2387,72 @@ export function OwnerDashboardPage({
           {settingsError && <p className="owner-dashboard__error">{settingsError}</p>}
           {settings && (
             <>
+              <div className="owner-dashboard__training">
+                <h3 className="owner-dashboard__training-title">تدريب أسلوب البيع</h3>
+                <p className="owner-dashboard__muted owner-dashboard__muted--tight">
+                  اختر شدة الإغلاق ونبرة الرد. البوت يطبّقها تلقائياً في شات المتجر وإنستغرام.
+                </p>
+
+                <fieldset className="owner-dashboard__training-fieldset">
+                  <legend>شدة البيع</legend>
+                  <div className="owner-dashboard__training-options">
+                    {SALES_AGGRESSION_OPTIONS.map((opt) => (
+                      <label
+                        key={opt.id}
+                        className={
+                          settings.ai_sales_aggression === opt.id
+                            ? "owner-dashboard__training-option is-active"
+                            : "owner-dashboard__training-option"
+                        }
+                      >
+                        <input
+                          type="radio"
+                          name="ai_sales_aggression"
+                          value={opt.id}
+                          checked={settings.ai_sales_aggression === opt.id}
+                          onChange={() =>
+                            setSettings({ ...settings, ai_sales_aggression: opt.id })
+                          }
+                        />
+                        <span>
+                          <strong>{opt.label}</strong>
+                          <small>{opt.hint}</small>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                <fieldset className="owner-dashboard__training-fieldset">
+                  <legend>نبرة الشخصية</legend>
+                  <div className="owner-dashboard__training-options owner-dashboard__training-options--tones">
+                    {PERSONA_TONE_OPTIONS.map((opt) => (
+                      <label
+                        key={opt.id}
+                        className={
+                          settings.ai_persona_tone === opt.id
+                            ? "owner-dashboard__training-option is-active"
+                            : "owner-dashboard__training-option"
+                        }
+                      >
+                        <input
+                          type="radio"
+                          name="ai_persona_tone"
+                          value={opt.id}
+                          checked={settings.ai_persona_tone === opt.id}
+                          onChange={() =>
+                            setSettings({ ...settings, ai_persona_tone: opt.id })
+                          }
+                        />
+                        <span>
+                          <strong>{opt.label}</strong>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              </div>
+
               <label>
                 تعليمات مساعد AI
                 <div className="owner-dashboard__ai-presets" aria-label="اقتراحات أسلوب سريعة">
@@ -2264,7 +2466,11 @@ export function OwnerDashboardPage({
                         const next = cur
                           ? `${cur}\n\n${preset.text}`
                           : preset.text;
-                        setSettings({ ...settings, ai_prompt: next });
+                        setSettings({
+                          ...settings,
+                          ai_prompt: next,
+                          ai_persona_tone: settings.ai_persona_tone || preset.id,
+                        });
                       }}
                     >
                       {preset.label}
@@ -2281,9 +2487,104 @@ export function OwnerDashboardPage({
                 />
               </label>
               <button type="button" onClick={saveSettings} disabled={settingsSaving}>
-                {settingsSaving ? "جاري الحفظ..." : "حفظ تعليمات AI"}
+                {settingsSaving ? "جاري الحفظ..." : "حفظ أسلوب البيع والتعليمات"}
               </button>
               {settingsMsg && <p className="owner-dashboard__success">{settingsMsg}</p>}
+
+              <div className="owner-dashboard__training owner-dashboard__training--examples">
+                <h3 className="owner-dashboard__training-title">أمثلة ردودك (تدريب)</h3>
+                <p className="owner-dashboard__muted owner-dashboard__muted--tight">
+                  أضف سيناريو: ماذا يقول الزبون؟ وماذا ترد أنت؟ البوت يقلّد أسلوبك في مواقف مشابهة.
+                </p>
+                {salesExamplesError ? (
+                  <p className="owner-dashboard__error">{salesExamplesError}</p>
+                ) : null}
+                {salesExamplesLoading ? (
+                  <p className="owner-dashboard__muted">جاري تحميل الأمثلة…</p>
+                ) : null}
+                {!salesExamplesLoading && salesExamples.length === 0 ? (
+                  <p className="owner-dashboard__muted">لا أمثلة بعد — أضف أول مثال بأسلوب متجرك.</p>
+                ) : null}
+                <ul className="owner-dashboard__training-examples">
+                  {salesExamples.map((ex) => (
+                    <li key={ex.id}>
+                      <div>
+                        <em>{ex.category}</em>
+                        <strong>الزبون: {ex.user_input}</strong>
+                        <span>ردك: {ex.ideal_response}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="dm-btn dm-btn--ghost dm-btn--sm"
+                        disabled={salesExampleSaving}
+                        onClick={() => void removeSalesExample(ex.id)}
+                      >
+                        حذف
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="owner-dashboard__training-form">
+                  <label>
+                    نوع السيناريو
+                    <select
+                      value={salesExampleDraft.category}
+                      onChange={(e) =>
+                        setSalesExampleDraft({
+                          ...salesExampleDraft,
+                          category: e.target.value,
+                        })
+                      }
+                    >
+                      {SALES_EXAMPLE_CATEGORIES.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    ماذا يقول الزبون؟
+                    <textarea
+                      rows={2}
+                      value={salesExampleDraft.user_input}
+                      placeholder="مثال: غالي عليّ"
+                      onChange={(e) =>
+                        setSalesExampleDraft({
+                          ...salesExampleDraft,
+                          user_input: e.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    ردّك المثالي
+                    <textarea
+                      rows={3}
+                      value={salesExampleDraft.ideal_response}
+                      placeholder="مثال: عيني السعر يشمل التوصيل والفحص بباب البيت — تحب L ولا XL؟"
+                      onChange={(e) =>
+                        setSalesExampleDraft({
+                          ...salesExampleDraft,
+                          ideal_response: e.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="dm-btn dm-btn--secondary"
+                    disabled={
+                      salesExampleSaving ||
+                      !salesExampleDraft.user_input.trim() ||
+                      !salesExampleDraft.ideal_response.trim()
+                    }
+                    onClick={() => void addSalesExample()}
+                  >
+                    {salesExampleSaving ? "جاري الحفظ…" : "إضافة مثال"}
+                  </button>
+                </div>
+              </div>
 
               {canCustomerMemory ? (
                 <div className="owner-dashboard__memory">

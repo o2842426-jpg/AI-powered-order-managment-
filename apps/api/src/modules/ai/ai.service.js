@@ -1,6 +1,10 @@
 const OpenAI = require("openai");
 const { listSalesExamplesForStore } = require("../salesTraining/salesExamples.repository");
 const { buildSalesTrainingBlock } = require("../salesTraining/salesTrainingPrompt");
+const {
+  normalizeSalesAggression,
+  buildPersonaToneBlock,
+} = require("../salesTraining/salesTraining.constants");
 const { buildClothingStorePromptBlock } = require("./clothingStorePrompt");
 const {
   buildStoreOnboardingPromptBlock,
@@ -189,8 +193,11 @@ ${igClose}
   return "";
 }
 
-/** @returns {"aggressive" | "balanced" | "soft"} */
-function resolveSalesMode() {
+/** @param {object} [store] @returns {"aggressive" | "balanced" | "soft"} */
+function resolveSalesMode(store) {
+  const fromStore = normalizeSalesAggression(store?.ai_sales_aggression);
+  if (fromStore) return fromStore;
+
   const raw = String(process.env.AI_SALES_MODE || "aggressive")
     .trim()
     .toLowerCase();
@@ -572,10 +579,11 @@ async function generateStoreChatReply({
     return { reply: FALLBACK_REPLY, recommended_product_ids: [] };
   }
 
-  const salesMode = resolveSalesMode();
+  const salesMode = resolveSalesMode(store);
   const phase = conversationPhase || "discovery";
   const catalogText = buildCatalogText(products, store?.currency_code);
   const ownerPrompt = buildOwnerPrompt(store);
+  const personaToneBlock = buildPersonaToneBlock(store?.ai_persona_tone);
   const salesPersona = buildExecutiveSalesPersonaBlock(
     store?.name,
     salesMode,
@@ -699,7 +707,7 @@ ${jsonInstructions}
 
 ${salesPersona}
 
-${onboardingBlock ? `${onboardingBlock}\n\n` : ""}${clothingVerticalBlock ? `${clothingVerticalBlock}\n\n` : ""}${dynamicStateBlock ? `${dynamicStateBlock}\n\n` : ""}${objectionBlock ? `${objectionBlock}\n\n` : ""}${checkoutBlock ? `${checkoutBlock}\n\n` : ""}${salesPlaybook}${trainingBlock ? `\n\n${trainingBlock}` : ""}
+${personaToneBlock ? `${personaToneBlock}\n\n` : ""}${onboardingBlock ? `${onboardingBlock}\n\n` : ""}${clothingVerticalBlock ? `${clothingVerticalBlock}\n\n` : ""}${dynamicStateBlock ? `${dynamicStateBlock}\n\n` : ""}${objectionBlock ? `${objectionBlock}\n\n` : ""}${checkoutBlock ? `${checkoutBlock}\n\n` : ""}${salesPlaybook}${trainingBlock ? `\n\n${trainingBlock}` : ""}
 
 تعليمات صاحب المتجر (ما لم تخالف الكتالوج أو قواعد الإغلاق):
 ${ownerPrompt}${channelBlock ? `\n\n${channelBlock}` : ""}${memoryBlock}${followupsBlock}`,

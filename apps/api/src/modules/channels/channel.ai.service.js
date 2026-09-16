@@ -201,6 +201,8 @@ async function processChannelAiReply({
           reply_dialect,
           default_payment,
           sell_summary,
+          ai_sales_aggression,
+          ai_persona_tone,
           subscription_status,
           plan_tier,
           stripe_price_id,

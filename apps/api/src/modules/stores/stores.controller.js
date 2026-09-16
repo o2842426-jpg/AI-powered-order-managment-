@@ -8,6 +8,10 @@ const {
   normalizeReplyDialect,
   normalizeDefaultPayment,
 } = require("./storeOnboarding.constants");
+const {
+  normalizeSalesAggression,
+  normalizePersonaTone,
+} = require("../salesTraining/salesTraining.constants");
 
 const STORE_CURRENCY_CODES = new Set(["SAR", "IQD", "USD"]);
 
@@ -35,6 +39,8 @@ const SETTINGS_SELECT = `
     reply_dialect,
     default_payment,
     sell_summary,
+    ai_sales_aggression,
+    ai_persona_tone,
     created_at
   FROM stores
   WHERE id = ?
@@ -79,12 +85,22 @@ function updateStoreSettings(req, res) {
       reply_dialect,
       default_payment,
       sell_summary,
+      ai_sales_aggression,
+      ai_persona_tone,
     } = req.body;
 
     const existingStore = db
       .prepare(
         `
-          SELECT id, currency_code, store_vertical, reply_dialect, default_payment, sell_summary
+          SELECT
+            id,
+            currency_code,
+            store_vertical,
+            reply_dialect,
+            default_payment,
+            sell_summary,
+            ai_sales_aggression,
+            ai_persona_tone
           FROM stores
           WHERE id = ?
         `
@@ -138,6 +154,36 @@ function updateStoreSettings(req, res) {
           : null
         : existingStore.sell_summary;
 
+    let nextAggression = existingStore.ai_sales_aggression;
+    if (ai_sales_aggression !== undefined) {
+      if (ai_sales_aggression === null || String(ai_sales_aggression).trim() === "") {
+        nextAggression = null;
+      } else {
+        const normalized = normalizeSalesAggression(ai_sales_aggression);
+        if (!normalized) {
+          return res.status(400).json({
+            message: "Invalid ai_sales_aggression (soft | balanced | aggressive).",
+          });
+        }
+        nextAggression = normalized;
+      }
+    }
+
+    let nextPersona = existingStore.ai_persona_tone;
+    if (ai_persona_tone !== undefined) {
+      if (ai_persona_tone === null || String(ai_persona_tone).trim() === "") {
+        nextPersona = null;
+      } else {
+        const normalized = normalizePersonaTone(ai_persona_tone);
+        if (!normalized) {
+          return res.status(400).json({
+            message: "Invalid ai_persona_tone (warm | concise | luxury | energetic).",
+          });
+        }
+        nextPersona = normalized;
+      }
+    }
+
     db.prepare(
       `
         UPDATE stores
@@ -154,7 +200,9 @@ function updateStoreSettings(req, res) {
           store_vertical = ?,
           reply_dialect = ?,
           default_payment = ?,
-          sell_summary = ?
+          sell_summary = ?,
+          ai_sales_aggression = ?,
+          ai_persona_tone = ?
         WHERE id = ?
       `
     ).run(
@@ -171,6 +219,8 @@ function updateStoreSettings(req, res) {
       nextDialect,
       nextPayment,
       nextSell,
+      nextAggression,
+      nextPersona,
       storeId
     );
 

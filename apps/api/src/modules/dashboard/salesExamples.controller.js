@@ -1,5 +1,9 @@
 const { assertStoreScope } = require("../stores/storeScope");
-const { insertSalesExample } = require("../salesTraining/salesExamples.repository");
+const {
+  listSalesExamplesForStore,
+  insertSalesExample,
+  deleteSalesExample,
+} = require("../salesTraining/salesExamples.repository");
 
 const VALID_CATEGORIES = new Set([
   "objection",
@@ -20,6 +24,32 @@ function normalizeCategory(raw) {
   if (VALID_CATEGORIES.has(c)) return c;
   if (/^[a-z][a-z0-9_]{1,30}$/.test(c)) return c;
   return null;
+}
+
+/**
+ * GET /api/dashboard/settings/examples?store_id=&category=
+ */
+function listSalesExamples(req, res) {
+  try {
+    const storeId = Number(req.query?.store_id ?? req.user?.store_id);
+    if (Number.isNaN(storeId) || storeId <= 0) {
+      return res.status(400).json({ message: "store_id must be a valid positive number." });
+    }
+    if (!assertStoreScope(req, res, storeId)) return;
+
+    const category = req.query?.category != null ? String(req.query.category).trim() : "";
+    const rows = listSalesExamplesForStore(storeId, {
+      category: category || undefined,
+      limit: 50,
+    });
+
+    return res.status(200).json({ data: rows });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Could not load sales training examples.",
+      error: error.message,
+    });
+  }
 }
 
 /**
@@ -79,6 +109,37 @@ function createSalesExample(req, res) {
   }
 }
 
+/**
+ * DELETE /api/dashboard/settings/examples/:exampleId?store_id=
+ */
+function removeSalesExample(req, res) {
+  try {
+    const storeId = Number(req.query?.store_id ?? req.body?.store_id ?? req.user?.store_id);
+    const exampleId = Number(req.params.exampleId);
+    if (Number.isNaN(storeId) || storeId <= 0) {
+      return res.status(400).json({ message: "store_id must be a valid positive number." });
+    }
+    if (Number.isNaN(exampleId) || exampleId <= 0) {
+      return res.status(400).json({ message: "exampleId must be a valid positive number." });
+    }
+    if (!assertStoreScope(req, res, storeId)) return;
+
+    const ok = deleteSalesExample(storeId, exampleId);
+    if (!ok) {
+      return res.status(404).json({ message: "Sales example not found." });
+    }
+
+    return res.status(200).json({ message: "Sales example deleted.", data: { id: exampleId } });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Could not delete sales training example.",
+      error: error.message,
+    });
+  }
+}
+
 module.exports = {
+  listSalesExamples,
   createSalesExample,
+  removeSalesExample,
 };
